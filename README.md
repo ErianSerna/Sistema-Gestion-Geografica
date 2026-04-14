@@ -231,12 +231,3 @@ Ya está corregido en `MapView.jsx` con la solución para Vite.
 El geocodingService.js incluye un delay automático de 1.1 segundos entre peticiones. Para importaciones masivas, considera usar Google Maps API (solo requiere cambiar el servicio de geocodificación).
 
 ---
-
-## 🔮 Próximas mejoras sugeridas
-
-- [ ] Dibujar cuadrantes en el mapa con Leaflet.draw
-- [ ] Importar GeoJSON oficial de comunas de Medellín (IDECA)
-- [ ] Autenticación JWT para proteger la API
-- [ ] WebSockets para sincronización en tiempo real entre usuarios
-- [ ] Exportar mapa como imagen/PDF
-- [ ] Historial de cambios por persona
