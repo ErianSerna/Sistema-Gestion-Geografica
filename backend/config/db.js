@@ -4,7 +4,7 @@
 
 const { Pool } = require('pg');
 
-const pool = new Pool({
+/*const pool = new Pool({
   host:     process.env.DB_HOST     || 'localhost',
   port:     parseInt(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME     || 'medellin_electoral',
@@ -16,7 +16,14 @@ const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000
+}); */
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: false // 👈 porque vamos a usar INTERNAL URL
 });
+
+console.log("DATABASE_URL:", process.env.DATABASE_URL ? "OK" : "NO EXISTE");
 
 // Verificar conexión al iniciar
 pool.connect((err, client, release) => {
@@ -27,6 +34,7 @@ pool.connect((err, client, release) => {
     console.log("DB_USER:", process.env.DB_USER);
     console.log("DB_NAME:", process.env.DB_NAME);
     console.log("DB_PASSWORD:", process.env.DB_PASSWORD);
+    console.log("DATABASE_URL:", process.env.DATABASE_URL ? "OK" : "NO EXISTE");
     return;
   }
   // Verificar que PostGIS esté instalado
