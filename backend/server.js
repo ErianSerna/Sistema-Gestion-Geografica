@@ -17,10 +17,32 @@ const PORT = process.env.PORT || 3000;
 // ── Seguridad y logging ─────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('combined'));
+// Configurar CORS dinámicamente
+const corsOrigins = [
+  'http://localhost:5173',      // desarrollo local
+  'http://localhost:3000',      // desarrollo local
+  'https://medellin-geograficacion-pacto.onrender.com',  // frontend production
+];
+
+const frontendUrl = process.env.FRONTEND_URL;
+if (frontendUrl && !corsOrigins.includes(frontendUrl)) {
+  corsOrigins.push(frontendUrl);
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Permitir requests sin origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (corsOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS no permitido para ' + origin));
+    }
+  },
   methods: ['GET','POST','PUT','DELETE','PATCH'],
   allowedHeaders: ['Content-Type','Authorization'],
+  credentials: true,
 }));
 
 // Rate limiting generoso para uso interno (300 req / 15 min)
