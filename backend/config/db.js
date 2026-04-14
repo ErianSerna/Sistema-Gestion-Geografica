@@ -12,7 +12,10 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'postgres',
   max: 20,                    // máx conexiones en el pool
   idleTimeoutMillis: 30000,   // cerrar conexiones inactivas tras 30s
-  connectionTimeoutMillis: 2000
+  connectionTimeoutMillis: 2000,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 // Verificar conexión al iniciar
