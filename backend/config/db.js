@@ -10,12 +10,12 @@ const pool = new Pool({
   database: process.env.DB_NAME     || 'medellin_electoral',
   user:     process.env.DB_USER     || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
-  max: 20,                    // máx conexiones en el pool
-  idleTimeoutMillis: 30000,   // cerrar conexiones inactivas tras 30s
-  connectionTimeoutMillis: 2000,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000
 });
 
 // Verificar conexión al iniciar
