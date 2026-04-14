@@ -23,6 +23,9 @@ pool.connect((err, client, release) => {
   if (err) {
     console.error('❌ Error conectando a PostgreSQL:', err.message);
     console.error('   Verifica las variables de entorno en .env');
+    console.log("DB_HOST:", process.env.DB_HOST);
+    console.log("DB_USER:", process.env.DB_USER);
+    console.log("DB_NAME:", process.env.DB_NAME);
     return;
   }
   // Verificar que PostGIS esté instalado
