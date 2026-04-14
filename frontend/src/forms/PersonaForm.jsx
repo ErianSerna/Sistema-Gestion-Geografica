@@ -1,0 +1,278 @@
+// ============================================================
+// frontend/src/forms/PersonaForm.jsx
+// Formulario crear/editar personas
+// — En modo crear: obtiene coords por geolocalización automáticamente
+// — En modo editar: pre-llena con datos de la persona
+// — Permite geocodificar por dirección manualmente
+// ============================================================
+
+import { useState, useEffect } from 'react';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
+
+const COMUNAS_MEDELLIN = [
+  'Popular','Santa Cruz','Manrique','Aranjuez','Castilla',
+  'Doce de Octubre','Robledo','Villa Hermosa','Buenos Aires',
+  'La Candelaria','Laureles','La América','San Javier',
+  'El Poblado','Guayabal','Belén'
+];
+
+const FORM_VACIO = {
+  nombre: '', cedula: '', telefono: '', direccion: '',
+  comuna: '', barrio: '', latitud: '', longitud: '', vota_pacto: false
+};
+
+export default function PersonaForm({ modo, persona, coordInicial, onGuardado, onCancelar }) {
+  const [form,           setForm]           = useState(FORM_VACIO);
+  const [geocodificando, setGeocodificando] = useState(false);
+  const [guardando,      setGuardando]      = useState(false);
+  const [errores,        setErrores]        = useState({});
+  const [geoStatus,      setGeoStatus]      = useState(''); // mensaje de estado de geoloc
+
+  // ── Inicialización del formulario ─────────────────────────
+  useEffect(() => {
+    if (modo === 'editar' && persona) {
+      // Si solo tenemos el id, cargamos los datos desde la API
+      if (persona.id && !persona.nombre) {
+        api.get(`/personas/${persona.id}`)
+          .then(({ data }) => {
+            setForm({
+              nombre:     data.nombre     || '',
+              cedula:     data.cedula     || '',
+              telefono:   data.telefono   || '',
+              direccion:  data.direccion  || '',
+              comuna:     data.comuna     || '',
+              barrio:     data.barrio     || '',
+              latitud:    data.latitud    || '',
+              longitud:   data.longitud   || '',
+              vota_pacto: data.vota_pacto || false,
+            });
+          })
+          .catch(() => toast.error('No se pudo cargar la persona'));
+      } else {
+        setForm({
+          nombre:     persona.nombre     || '',
+          cedula:     persona.cedula     || '',
+          telefono:   persona.telefono   || '',
+          direccion:  persona.direccion  || '',
+          comuna:     persona.comuna     || '',
+          barrio:     persona.barrio     || '',
+          latitud:    persona.latitud    || '',
+          longitud:   persona.longitud   || '',
+          vota_pacto: persona.vota_pacto || false,
+        });
+      }
+      return;
+    }
+
+    // Modo crear
+    if (coordInicial) {
+      // Coordenadas pasadas explícitamente (click en mapa, si se usa)
+      setForm(f => ({
+        ...f,
+        latitud:  String(coordInicial.latitud.toFixed ? coordInicial.latitud.toFixed(6) : coordInicial.latitud),
+        longitud: String(coordInicial.longitud.toFixed ? coordInicial.longitud.toFixed(6) : coordInicial.longitud),
+      }));
+    } else {
+      // Obtener coords por geolocalización del dispositivo/navegador
+      obtenerGeolocalizacion();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const obtenerGeolocalizacion = () => {
+    if (!navigator.geolocation) {
+      setGeoStatus('');
+      return;
+    }
+    setGeoStatus('📡 Obteniendo ubicación...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm(f => ({
+          ...f,
+          latitud:  pos.coords.latitude.toFixed(6),
+          longitud: pos.coords.longitude.toFixed(6),
+        }));
+        setGeoStatus('📍 Ubicación obtenida automáticamente');
+        setTimeout(() => setGeoStatus(''), 3000);
+      },
+      () => {
+        // Si falla la geoloc, dejamos los campos vacíos para que el usuario los llene
+        setGeoStatus('');
+      },
+      { timeout: 6000, maximumAge: 30000 }
+    );
+  };
+
+  const cambiar = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
+    if (errores[name]) setErrores(er => ({ ...er, [name]: null }));
+  };
+
+  const geocodificar = async () => {
+    if (!form.direccion) {
+      toast.error('Ingresa una dirección primero');
+      return;
+    }
+    setGeocodificando(true);
+    try {
+      const { data } = await api.get('/geocodificar', {
+        params: { direccion: form.direccion, barrio: form.barrio }
+      });
+      setForm(f => ({
+        ...f,
+        latitud:  data.latitud.toFixed(6),
+        longitud: data.longitud.toFixed(6),
+      }));
+      toast.success(`📍 Ubicado correctamente`);
+    } catch {
+      toast.error('No se pudo geocodificar. Intenta con más detalle.');
+    } finally {
+      setGeocodificando(false);
+    }
+  };
+
+  const validar = () => {
+    const e = {};
+    if (!form.nombre.trim()) e.nombre   = 'Requerido';
+    if (!form.cedula.trim()) e.cedula   = 'Requerido';
+    if (!form.latitud)       e.latitud  = 'Requerido — usa "Geocodificar" o permite la ubicación';
+    if (!form.longitud)      e.longitud = 'Requerido';
+    setErrores(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const guardar = async (e) => {
+    e.preventDefault();
+    if (!validar()) return;
+    setGuardando(true);
+    try {
+      const payload = {
+        ...form,
+        latitud:  parseFloat(form.latitud),
+        longitud: parseFloat(form.longitud),
+      };
+      if (modo === 'crear') {
+        await api.post('/personas', payload);
+        toast.success('✅ Persona creada');
+      } else {
+        await api.put(`/personas/${persona.id}`, payload);
+        toast.success('✅ Persona actualizada');
+      }
+      onGuardado();
+    } catch (err) {
+      if (err.response?.status === 409) {
+        setErrores({ cedula: 'Ya existe esta cédula' });
+        toast.error('Esta cédula ya está registrada');
+      } else {
+        toast.error(err.response?.data?.error || 'Error guardando');
+      }
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <form onSubmit={guardar} className="persona-form">
+      <h2 style={{ margin: '0 0 1.25rem', fontSize: '18px', fontWeight: 500 }}>
+        {modo === 'crear' ? '➕ Nueva persona' : '✏️ Editar persona'}
+      </h2>
+
+      <div className="form-grid">
+        <div className="form-field">
+          <label>Nombre completo *</label>
+          <input name="nombre" value={form.nombre} onChange={cambiar} placeholder="Juan García" />
+          {errores.nombre && <span className="form-error">{errores.nombre}</span>}
+        </div>
+
+        <div className="form-field">
+          <label>Cédula *</label>
+          <input name="cedula" value={form.cedula} onChange={cambiar} placeholder="1234567890" />
+          {errores.cedula && <span className="form-error">{errores.cedula}</span>}
+        </div>
+
+        <div className="form-field">
+          <label>Teléfono</label>
+          <input name="telefono" value={form.telefono} onChange={cambiar} placeholder="3001234567" />
+        </div>
+
+        <div className="form-field">
+          <label>Comuna</label>
+          <select name="comuna" value={form.comuna} onChange={cambiar}>
+            <option value="">Seleccionar...</option>
+            {COMUNAS_MEDELLIN.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <div className="form-field form-field--full">
+          <label>Dirección</label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              name="direccion" value={form.direccion} onChange={cambiar}
+              placeholder="Carrera 50 # 45-20"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button" onClick={geocodificar}
+              className="btn-secondary" disabled={geocodificando}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {geocodificando ? '⏳' : '📍'} Geocodificar
+            </button>
+          </div>
+        </div>
+
+        <div className="form-field">
+          <label>Barrio</label>
+          <input name="barrio" value={form.barrio} onChange={cambiar} placeholder="Estadio" />
+        </div>
+
+        {/* Coordenadas con botón para re-obtener geoloc */}
+        <div className="form-field">
+          <label>
+            Latitud *
+            {modo === 'crear' && (
+              <button
+                type="button"
+                onClick={obtenerGeolocalizacion}
+                title="Usar mi ubicación actual"
+                style={{ marginLeft: '6px', fontSize: '11px', padding: '1px 6px', cursor: 'pointer', background: 'none', border: '1px solid #ccc', borderRadius: '4px' }}
+              >
+                📡 Mi ubicación
+              </button>
+            )}
+          </label>
+          <input name="latitud" type="number" step="any" value={form.latitud} onChange={cambiar} placeholder="6.2518" />
+          {errores.latitud && <span className="form-error">{errores.latitud}</span>}
+        </div>
+
+        <div className="form-field">
+          <label>Longitud *</label>
+          <input name="longitud" type="number" step="any" value={form.longitud} onChange={cambiar} placeholder="-75.5636" />
+          {errores.longitud && <span className="form-error">{errores.longitud}</span>}
+        </div>
+
+        {/* Estado de geolocalización */}
+        {geoStatus && (
+          <div className="form-field form-field--full">
+            <p style={{ fontSize: '12px', color: '#2563EB', margin: 0 }}>{geoStatus}</p>
+          </div>
+        )}
+
+        <div className="form-field form-field--full">
+          <label className="checkbox-label">
+            <input type="checkbox" name="vota_pacto" checked={form.vota_pacto} onChange={cambiar} />
+            <span>Vota por el Pacto Histórico</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="form-actions">
+        <button type="button" onClick={onCancelar} className="btn-secondary">Cancelar</button>
+        <button type="submit" className="btn-primary" disabled={guardando}>
+          {guardando ? 'Guardando...' : (modo === 'crear' ? '✅ Crear persona' : '✅ Guardar cambios')}
+        </button>
+      </div>
+    </form>
+  );
+}
