@@ -1,4 +1,4 @@
-# 🗳️ Medellín Electoral — Sistema de Gestión Geográfica
+# 🗳️ Sistema de Gestión Geográfica
 
 Aplicación MVC para gestión de información geográfica y electoral en Medellín.
 Sincronización bidireccional entre mapa interactivo y Excel.
