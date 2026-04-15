@@ -343,8 +343,8 @@ export default function MapView({
     map.getPane('kmlLabelPane').style.zIndex = 250;
     map.getPane('kmlLabelPane').style.pointerEvents = 'none';
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors', maxZoom: 19,
+    L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
+      attribution: '© CartoDB © OpenStreetMap', maxZoom: 19,
     }).addTo(map);
 
     cuadrantesLayer.current = L.layerGroup().addTo(map);
