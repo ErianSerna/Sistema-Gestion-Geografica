@@ -8,7 +8,7 @@ Sincronización bidireccional entre mapa interactivo y Excel.
 ## 🏗️ Arquitectura
 
 ```
-/medellin-electoral
+/Sistema-Gestion-Geografica-main
 ├── /backend
 │   ├── server.js              ← Punto de entrada Express
 │   ├── /config
