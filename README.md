@@ -223,11 +223,4 @@ ogr2ogr -f "PostgreSQL" PG:"host=localhost dbname=medellin_electoral user=postgr
 \c medellin_electoral
 CREATE EXTENSION postgis;
 ```
-
-**Leaflet icons no aparecen:**  
-Ya está corregido en `MapView.jsx` con la solución para Vite.
-
-**Nominatim rate limit:**  
-El geocodingService.js incluye un delay automático de 1.1 segundos entre peticiones. Para importaciones masivas, considera usar Google Maps API (solo requiere cambiar el servicio de geocodificación).
-
 ---
