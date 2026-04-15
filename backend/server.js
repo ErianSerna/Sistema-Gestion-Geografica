@@ -21,7 +21,8 @@ app.use(morgan('combined'));
 const corsOrigins = [
   'http://localhost:5173',      // desarrollo local
   'http://localhost:3000',      // desarrollo local
-  'https://medellin-geograficacion-pacto.onrender.com',  // frontend production
+  'https://medellin-geograficacion-pacto.onrender.com',
+  'https://Sistema-Gestion-Geografica.onrender.com', // frontend production
 ];
 
 const frontendUrl = process.env.FRONTEND_URL;
