@@ -96,10 +96,14 @@ export default function App() {
 
       <header className="app-header">
         <div className="header-brand">
-          <span className="header-icon">🗳️</span>
+            <img 
+              src="/pacto_logo.png" 
+              alt="Logo Pacto" 
+              className="header-logo"
+            />
           <div>
-            <h1>Medellín Electoral</h1>
-            <p>Gestión geográfica y electoral por comunas</p>
+            <h1>Sistema de gestión geografica</h1>
+            <p>Manejo geográfico y electoral por comunas</p>
           </div>
         </div>
 

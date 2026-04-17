@@ -66,8 +66,6 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
         latitud:  String(coordInicial.latitud.toFixed  ? coordInicial.latitud.toFixed(6)  : coordInicial.latitud),
         longitud: String(coordInicial.longitud.toFixed ? coordInicial.longitud.toFixed(6) : coordInicial.longitud),
       }));
-    } else {
-      obtenerGeolocalizacion();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -205,15 +203,7 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
         </div>
 
         <div className="form-field">
-          <label>
-            Latitud *
-            {modo === 'crear' && (
-              <button type="button" onClick={obtenerGeolocalizacion} title="Usar mi ubicación actual"
-                style={{ marginLeft:'6px', fontSize:'11px', padding:'1px 6px', cursor:'pointer', background:'none', border:'1px solid #ccc', borderRadius:'4px' }}>
-                📡 Mi ubicación
-              </button>
-            )}
-          </label>
+          <label>Latitud *</label>
           <input name="latitud" type="number" step="any" value={form.latitud} onChange={cambiar} placeholder="6.2518" />
           {errores.latitud && <span className="form-error">{errores.latitud}</span>}
         </div>
