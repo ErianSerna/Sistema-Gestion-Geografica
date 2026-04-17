@@ -28,11 +28,9 @@ const KML_COLORS = ['#7C3AED','#0891B2','#D97706','#059669','#DC2626','#DB2777',
 
 const CUAD_FORM_VACIO = { nombre: '', descripcion: '', barrio: '' };
 
-const crearIcono = (votaPacto) => L.divIcon({
+const crearIcono = () => L.divIcon({
   className: '',
-  html: `<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${
-    votaPacto ? '#2C9A5E' : '#E54B4B'
-  };border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
+  html: `<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#2563EB;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
   iconSize: [26,26], iconAnchor: [13,26], popupAnchor: [0,-28],
 });
 
@@ -47,16 +45,12 @@ function crearPopupDOM(p) {
       <span>📋 ${esc(p.cedula)}</span>
       <span>📞 ${esc(p.telefono)||'-'}</span>
     </div>
+    ${p.correo ? `<div style="font-size:12px;margin-bottom:6px">✉️ ${esc(p.correo)}</div>` : ''}
     <div style="font-size:12px;margin-bottom:6px">
       <strong>Barrio:</strong> ${esc(p.barrio)||'-'} &nbsp;
       <strong>Comuna:</strong> ${esc(p.comuna)||'-'}
     </div>
     ${p.cuadrante ? `<div style="font-size:12px;margin-bottom:6px"><strong>Cuadrante:</strong> ${esc(p.cuadrante)}</div>` : ''}
-    <span style="display:inline-block;background:${p.vota_pacto?'#D1FAE5':'#FEE2E2'};color:${
-      p.vota_pacto?'#065F46':'#991B1B'
-    };padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500;">
-      ${p.vota_pacto?'✅ Vota Pacto Histórico':'❌ No Pacto'}
-    </span>
   `;
   const btn = document.createElement('button');
   btn.textContent = '✏️ Editar';
@@ -185,11 +179,11 @@ export default function MapView({
   const kmlLayersRef    = useRef({});
   const cuadPoliLayer   = useRef(null);
   const cuadPuntosLayer = useRef(null);
-  const filtrosRef      = useRef({ vota_pacto: '', comuna: '' });
+  const filtrosRef      = useRef({ comuna: '' });
   const kmlFileRef      = useRef(null);
   const mapInitialized  = useRef(false);
 
-  const [filtros,      setFiltros]      = useState({ vota_pacto: '', comuna: '' });
+  const [filtros,      setFiltros]      = useState({ comuna: '' });
   const [loading,      setLoading]      = useState(false);
   // kmlCapas: estado de capas KML con visibilidad persistida en localStorage
   const [kmlCapas,     setKmlCapas]     = useState(() => {
@@ -235,7 +229,7 @@ export default function MapView({
             `<div style="font-family:system-ui;min-width:140px">
               <strong style="font-size:13px">${p.nombre}</strong>
               ${p.barrio ? `<br><span style="font-size:11px;color:#666">${p.barrio}</span>` : ''}
-              <br><span style="font-size:12px">👥 ${p.total_personas} personas &nbsp; ✅ ${p.votantes_pacto} Pacto</span>
+              <br><span style="font-size:12px">👥 ${p.total_personas} personas</span>
             </div>`,
             { sticky: true }
           );
@@ -256,7 +250,7 @@ export default function MapView({
             setTimeout(() => layer.setStyle({
               color, weight: 2, fillColor: color, fillOpacity: 0.25, opacity: 0.85,
             }), 1200);
-            toast(`📍 ${p.nombre}${p.barrio ? ` — ${p.barrio}` : ''}: ${p.total_personas} personas, ${p.votantes_pacto} Pacto`);
+            toast(`📍 ${p.nombre}${p.barrio ? ` — ${p.barrio}` : ''}: ${p.total_personas} personas`);
           });
         },
       }).addTo(cuadrantesLayer.current);
@@ -269,14 +263,13 @@ export default function MapView({
     setLoading(true);
     try {
       const params = {};
-      if (f.vota_pacto !== '') params.vota_pacto = f.vota_pacto;
-      if (f.comuna)            params.comuna      = f.comuna;
+      if (f.comuna) params.comuna = f.comuna;
       const { data } = await api.get('/personas/geojson', { params });
       markersLayer.current.clearLayers();
       if (!data.features?.length) return;
       L.geoJSON(data, {
         pointToLayer: (feature, latlng) =>
-          L.marker(latlng, { icon: crearIcono(feature.properties.vota_pacto) }),
+          L.marker(latlng, { icon: crearIcono() }),
         onEachFeature: (feature, layer) => {
           const p = feature.properties;
           layer.bindPopup(() => crearPopupDOM(p), { maxWidth: 280 });
@@ -579,11 +572,6 @@ export default function MapView({
 
       {/* Toolbar */}
       <div className="map-toolbar">
-        <select value={filtros.vota_pacto} onChange={e=>setFiltros(f=>({...f,vota_pacto:e.target.value}))} className="filter-select">
-          <option value="">Todos los votantes</option>
-          <option value="true">✅ Solo Pacto</option>
-          <option value="false">❌ Solo No-Pacto</option>
-        </select>
         <select value={filtros.comuna} onChange={e=>setFiltros(f=>({...f,comuna:e.target.value}))} className="filter-select">
           <option value="">Todas las comunas</option>
           {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
@@ -725,8 +713,7 @@ export default function MapView({
 
       {/* Leyenda */}
       <div className="map-legend">
-        <div className="legend-item"><span className="pin-dot" style={{background:'#2C9A5E'}}/>Pacto</div>
-        <div className="legend-item"><span className="pin-dot" style={{background:'#E54B4B'}}/>No Pacto</div>
+        <div className="legend-item"><span className="pin-dot" style={{background:'#2563EB'}}/>Personas</div>
         <div className="legend-item"><span className="cuadrante-square"/>Cuadrante</div>
       </div>
 

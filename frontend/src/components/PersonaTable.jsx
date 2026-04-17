@@ -20,7 +20,6 @@ export default function PersonaTable({ onEdit }) {
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState({
     busqueda:   '',
-    vota_pacto: '',
     comuna:     ''
   });
   const [deleteModal, setDeleteModal] = useState(null); // { id, nombre }
@@ -58,8 +57,6 @@ export default function PersonaTable({ onEdit }) {
 
   // Filtrado en cliente sobre los datos ya cargados
   const filtradas = personas.filter(p => {
-    if (filtros.vota_pacto === 'true'  && !p.vota_pacto) return false;
-    if (filtros.vota_pacto === 'false' &&  p.vota_pacto) return false;
     if (filtros.comuna && p.comuna !== filtros.comuna)   return false;
     if (filtros.busqueda) {
       const q = filtros.busqueda.toLowerCase();
@@ -67,7 +64,9 @@ export default function PersonaTable({ onEdit }) {
         (p.nombre  || '').toLowerCase().includes(q) ||
         (p.cedula  || '').toLowerCase().includes(q) ||
         (p.barrio  || '').toLowerCase().includes(q) ||
-        (p.direccion || '').toLowerCase().includes(q)
+        (p.direccion || '').toLowerCase().includes(q) ||
+        (p.correo  || '').toLowerCase().includes(q) ||
+        (p.municipio || '').toLowerCase().includes(q)
       );
     }
     return true;
@@ -100,16 +99,6 @@ export default function PersonaTable({ onEdit }) {
           ))}
         </select>
 
-        <select
-          value={filtros.vota_pacto}
-          onChange={e => setFiltros(f => ({ ...f, vota_pacto: e.target.value }))}
-          className="filter-select"
-        >
-          <option value="">Todos los votantes</option>
-          <option value="true">✅ Solo Pacto</option>
-          <option value="false">❌ Solo No-Pacto</option>
-        </select>
-
         <button onClick={cargar} className="btn-secondary" title="Recargar">
           🔄
         </button>
@@ -125,19 +114,21 @@ export default function PersonaTable({ onEdit }) {
               <th>Nombre</th>
               <th>Cédula</th>
               <th>Teléfono</th>
+              <th>Correo</th>
               <th>Dirección</th>
               <th>Barrio</th>
               <th>Comuna</th>
+              <th>Municipio</th>
               <th>Cuadrante</th>
               <th>Coordenadas</th>
-              <th>Pacto</th>
+              
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
+                <td colSpan={12} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
                   {personas.length === 0
                     ? 'No hay personas registradas aún. Agrega pins en el mapa o importa un Excel.'
                     : 'Ningún registro coincide con los filtros aplicados.'}
@@ -149,22 +140,22 @@ export default function PersonaTable({ onEdit }) {
                   <td style={{ fontWeight: 500 }}>{p.nombre}</td>
                   <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{p.cedula}</td>
                   <td>{p.telefono || '-'}</td>
+                  <td style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={p.correo}>
+                    {p.correo || '-'}
+                  </td>
                   <td style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                       title={p.direccion}>
                     {p.direccion || '-'}
                   </td>
                   <td>{p.barrio || '-'}</td>
                   <td>{p.comuna || '-'}</td>
+                  <td>{p.municipio || '-'}</td>
                   <td>{p.cuadrante_nombre || <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Sin asignar</span>}</td>
                   <td style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
                     {p.latitud && p.longitud
                       ? `${parseFloat(p.latitud).toFixed(4)}, ${parseFloat(p.longitud).toFixed(4)}`
                       : '-'}
-                  </td>
-                  <td>
-                    <span className={`badge ${p.vota_pacto ? 'badge-green' : 'badge-red'}`}>
-                      {p.vota_pacto ? '✅ Sí' : '❌ No'}
-                    </span>
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '4px' }}>

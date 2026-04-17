@@ -13,7 +13,10 @@ const pool = new Pool({
   port:     parseInt(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME     || 'medellin_electoral',
   user:     process.env.DB_USER     || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres'
+  password: process.env.DB_PASSWORD || 'postgres',
+  ssl: process.env.DB_HOST?.includes('render.com') 
+    ? { rejectUnauthorized: false }  // Render requiere SSL
+    : false                           // Local sin SSL
 });
 
 async function inicializar() {

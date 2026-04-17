@@ -1,9 +1,5 @@
 // ============================================================
 // frontend/src/forms/PersonaForm.jsx
-// Formulario crear/editar personas
-// — En modo crear: obtiene coords por geolocalización automáticamente
-// — En modo editar: pre-llena con datos de la persona
-// — Permite geocodificar por dirección manualmente
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -18,8 +14,9 @@ const COMUNAS_MEDELLIN = [
 ];
 
 const FORM_VACIO = {
-  nombre: '', cedula: '', telefono: '', direccion: '',
-  comuna: '', barrio: '', latitud: '', longitud: '', vota_pacto: false
+  nombre: '', cedula: '', telefono: '', correo: '',
+  direccion: '', municipio: '', comuna: '', barrio: '',
+  latitud: '', longitud: ''
 };
 
 export default function PersonaForm({ modo, persona, coordInicial, onGuardado, onCancelar }) {
@@ -27,63 +24,55 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
   const [geocodificando, setGeocodificando] = useState(false);
   const [guardando,      setGuardando]      = useState(false);
   const [errores,        setErrores]        = useState({});
-  const [geoStatus,      setGeoStatus]      = useState(''); // mensaje de estado de geoloc
+  const [geoStatus,      setGeoStatus]      = useState('');
 
-  // ── Inicialización del formulario ─────────────────────────
   useEffect(() => {
     if (modo === 'editar' && persona) {
-      // Si solo tenemos el id, cargamos los datos desde la API
       if (persona.id && !persona.nombre) {
         api.get(`/personas/${persona.id}`)
-          .then(({ data }) => {
-            setForm({
-              nombre:     data.nombre     || '',
-              cedula:     data.cedula     || '',
-              telefono:   data.telefono   || '',
-              direccion:  data.direccion  || '',
-              comuna:     data.comuna     || '',
-              barrio:     data.barrio     || '',
-              latitud:    data.latitud    || '',
-              longitud:   data.longitud   || '',
-              vota_pacto: data.vota_pacto || false,
-            });
-          })
+          .then(({ data }) => setForm({
+            nombre:    data.nombre    || '',
+            cedula:    data.cedula    || '',
+            telefono:  data.telefono  || '',
+            correo:    data.correo    || '',
+            direccion: data.direccion || '',
+            municipio: data.municipio || '',
+            comuna:    data.comuna    || '',
+            barrio:    data.barrio    || '',
+            latitud:   data.latitud   || '',
+            longitud:  data.longitud  || '',
+          }))
           .catch(() => toast.error('No se pudo cargar la persona'));
       } else {
         setForm({
-          nombre:     persona.nombre     || '',
-          cedula:     persona.cedula     || '',
-          telefono:   persona.telefono   || '',
-          direccion:  persona.direccion  || '',
-          comuna:     persona.comuna     || '',
-          barrio:     persona.barrio     || '',
-          latitud:    persona.latitud    || '',
-          longitud:   persona.longitud   || '',
-          vota_pacto: persona.vota_pacto || false,
+          nombre:    persona.nombre    || '',
+          cedula:    persona.cedula    || '',
+          telefono:  persona.telefono  || '',
+          correo:    persona.correo    || '',
+          direccion: persona.direccion || '',
+          municipio: persona.municipio || '',
+          comuna:    persona.comuna    || '',
+          barrio:    persona.barrio    || '',
+          latitud:   persona.latitud   || '',
+          longitud:  persona.longitud  || '',
         });
       }
       return;
     }
 
-    // Modo crear
     if (coordInicial) {
-      // Coordenadas pasadas explícitamente (click en mapa, si se usa)
       setForm(f => ({
         ...f,
-        latitud:  String(coordInicial.latitud.toFixed ? coordInicial.latitud.toFixed(6) : coordInicial.latitud),
+        latitud:  String(coordInicial.latitud.toFixed  ? coordInicial.latitud.toFixed(6)  : coordInicial.latitud),
         longitud: String(coordInicial.longitud.toFixed ? coordInicial.longitud.toFixed(6) : coordInicial.longitud),
       }));
     } else {
-      // Obtener coords por geolocalización del dispositivo/navegador
       obtenerGeolocalizacion();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const obtenerGeolocalizacion = () => {
-    if (!navigator.geolocation) {
-      setGeoStatus('');
-      return;
-    }
+    if (!navigator.geolocation) return;
     setGeoStatus('📡 Obteniendo ubicación...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -95,36 +84,26 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
         setGeoStatus('📍 Ubicación obtenida automáticamente');
         setTimeout(() => setGeoStatus(''), 3000);
       },
-      () => {
-        // Si falla la geoloc, dejamos los campos vacíos para que el usuario los llene
-        setGeoStatus('');
-      },
+      () => setGeoStatus(''),
       { timeout: 6000, maximumAge: 30000 }
     );
   };
 
   const cambiar = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
+    const { name, value } = e.target;
+    setForm(f => ({ ...f, [name]: value }));
     if (errores[name]) setErrores(er => ({ ...er, [name]: null }));
   };
 
   const geocodificar = async () => {
-    if (!form.direccion) {
-      toast.error('Ingresa una dirección primero');
-      return;
-    }
+    if (!form.direccion) { toast.error('Ingresa una dirección primero'); return; }
     setGeocodificando(true);
     try {
       const { data } = await api.get('/geocodificar', {
         params: { direccion: form.direccion, barrio: form.barrio }
       });
-      setForm(f => ({
-        ...f,
-        latitud:  data.latitud.toFixed(6),
-        longitud: data.longitud.toFixed(6),
-      }));
-      toast.success(`📍 Ubicado correctamente`);
+      setForm(f => ({ ...f, latitud: data.latitud.toFixed(6), longitud: data.longitud.toFixed(6) }));
+      toast.success('📍 Ubicado correctamente');
     } catch {
       toast.error('No se pudo geocodificar. Intenta con más detalle.');
     } finally {
@@ -134,9 +113,9 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
 
   const validar = () => {
     const e = {};
-    if (!form.nombre.trim()) e.nombre   = 'Requerido';
-    if (!form.cedula.trim()) e.cedula   = 'Requerido';
-    if (!form.latitud)       e.latitud  = 'Requerido — usa "Geocodificar" o permite la ubicación';
+    if (!form.nombre.trim()) e.nombre  = 'Requerido';
+    if (!form.cedula.trim()) e.cedula  = 'Requerido';
+    if (!form.latitud)       e.latitud = 'Requerido — usa "Geocodificar" o permite la ubicación';
     if (!form.longitud)      e.longitud = 'Requerido';
     setErrores(e);
     return Object.keys(e).length === 0;
@@ -147,11 +126,7 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
     if (!validar()) return;
     setGuardando(true);
     try {
-      const payload = {
-        ...form,
-        latitud:  parseFloat(form.latitud),
-        longitud: parseFloat(form.longitud),
-      };
+      const payload = { ...form, latitud: parseFloat(form.latitud), longitud: parseFloat(form.longitud) };
       if (modo === 'crear') {
         await api.post('/personas', payload);
         toast.success('✅ Persona creada');
@@ -197,6 +172,11 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
         </div>
 
         <div className="form-field">
+          <label>Correo electrónico</label>
+          <input name="correo" type="email" value={form.correo} onChange={cambiar} placeholder="ejemplo@correo.com (opcional)" />
+        </div>
+
+        <div className="form-field">
           <label>Comuna</label>
           <select name="comuna" value={form.comuna} onChange={cambiar}>
             <option value="">Seleccionar...</option>
@@ -204,40 +184,32 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
           </select>
         </div>
 
+        <div className="form-field">
+          <label>Barrio</label>
+          <input name="barrio" value={form.barrio} onChange={cambiar} placeholder="Estadio" />
+        </div>
+
         <div className="form-field form-field--full">
           <label>Dirección</label>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              name="direccion" value={form.direccion} onChange={cambiar}
-              placeholder="Carrera 50 # 45-20"
-              style={{ flex: 1 }}
-            />
-            <button
-              type="button" onClick={geocodificar}
-              className="btn-secondary" disabled={geocodificando}
-              style={{ whiteSpace: 'nowrap' }}
-            >
+            <input name="direccion" value={form.direccion} onChange={cambiar} placeholder="Carrera 50 # 45-20" style={{ flex: 1 }} />
+            <button type="button" onClick={geocodificar} className="btn-secondary" disabled={geocodificando} style={{ whiteSpace: 'nowrap' }}>
               {geocodificando ? '⏳' : '📍'} Geocodificar
             </button>
           </div>
         </div>
 
         <div className="form-field">
-          <label>Barrio</label>
-          <input name="barrio" value={form.barrio} onChange={cambiar} placeholder="Estadio" />
+          <label>Municipio</label>
+          <input name="municipio" value={form.municipio} onChange={cambiar} placeholder="Medellín (opcional)" />
         </div>
 
-        {/* Coordenadas con botón para re-obtener geoloc */}
         <div className="form-field">
           <label>
             Latitud *
             {modo === 'crear' && (
-              <button
-                type="button"
-                onClick={obtenerGeolocalizacion}
-                title="Usar mi ubicación actual"
-                style={{ marginLeft: '6px', fontSize: '11px', padding: '1px 6px', cursor: 'pointer', background: 'none', border: '1px solid #ccc', borderRadius: '4px' }}
-              >
+              <button type="button" onClick={obtenerGeolocalizacion} title="Usar mi ubicación actual"
+                style={{ marginLeft:'6px', fontSize:'11px', padding:'1px 6px', cursor:'pointer', background:'none', border:'1px solid #ccc', borderRadius:'4px' }}>
                 📡 Mi ubicación
               </button>
             )}
@@ -252,19 +224,11 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
           {errores.longitud && <span className="form-error">{errores.longitud}</span>}
         </div>
 
-        {/* Estado de geolocalización */}
         {geoStatus && (
           <div className="form-field form-field--full">
             <p style={{ fontSize: '12px', color: '#2563EB', margin: 0 }}>{geoStatus}</p>
           </div>
         )}
-
-        <div className="form-field form-field--full">
-          <label className="checkbox-label">
-            <input type="checkbox" name="vota_pacto" checked={form.vota_pacto} onChange={cambiar} />
-            <span>Vota por el Pacto Histórico</span>
-          </label>
-        </div>
       </div>
 
       <div className="form-actions">
