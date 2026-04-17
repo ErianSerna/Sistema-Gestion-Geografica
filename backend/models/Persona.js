@@ -7,25 +7,24 @@ const { query, withTransaction } = require('../config/db');
 class Persona {
   static async crear(datos) {
     const {
-      nombre, cedula, telefono, direccion,
-      comuna, barrio, latitud, longitud, vota_pacto = false
+      nombre, cedula, telefono, correo, direccion,
+      municipio, comuna, barrio, latitud, longitud
     } = datos;
 
-    // Cast explícito a numeric para evitar "tipos inconsistentes" en PG
     const sql = `
       INSERT INTO personas (
-        nombre, cedula, telefono, direccion,
-        comuna, barrio, latitud, longitud,
+        nombre, cedula, telefono, correo, direccion,
+        municipio, comuna, barrio, latitud, longitud,
         vota_pacto, geom, cuadrante_id
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6,
-        $7::numeric, $8::numeric,
-        $9,
-        ST_SetSRID(ST_MakePoint($8::numeric, $7::numeric), 4326),
+        $1, $2, $3, $4, $5, $6, $7, $8,
+        $9::numeric, $10::numeric,
+        TRUE,
+        ST_SetSRID(ST_MakePoint($10::numeric, $9::numeric), 4326),
         (
           SELECT c.id FROM cuadrantes c
-          WHERE ST_Contains(c.geom, ST_SetSRID(ST_MakePoint($8::numeric, $7::numeric), 4326))
+          WHERE ST_Contains(c.geom, ST_SetSRID(ST_MakePoint($10::numeric, $9::numeric), 4326))
           LIMIT 1
         )
       )
@@ -33,26 +32,22 @@ class Persona {
     `;
 
     const result = await query(sql, [
-      nombre, cedula, telefono || null, direccion || null,
-      comuna || null, barrio || null,
-      parseFloat(latitud), parseFloat(longitud),
-      Boolean(vota_pacto)
+      nombre, cedula,
+      telefono  || null, correo    || null, direccion || null,
+      municipio || null, comuna    || null, barrio    || null,
+      parseFloat(latitud), parseFloat(longitud)
     ]);
     return result.rows[0];
   }
 
   static async obtenerTodas(filtros = {}) {
-    let condiciones = [];
-    let params = [];
-    let idx = 1;
+    const condiciones = [];
+    const params      = [];
+    let   idx         = 1;
 
-    if (filtros.comuna)      { condiciones.push(`p.comuna = $${idx++}`);         params.push(filtros.comuna); }
-    if (filtros.barrio)      { condiciones.push(`p.barrio ILIKE $${idx++}`);      params.push(`%${filtros.barrio}%`); }
-    if (filtros.vota_pacto !== undefined) {
-      condiciones.push(`p.vota_pacto = $${idx++}`);
-      params.push(filtros.vota_pacto);
-    }
-    if (filtros.cuadrante_id){ condiciones.push(`p.cuadrante_id = $${idx++}`);   params.push(filtros.cuadrante_id); }
+    if (filtros.comuna)       { condiciones.push(`p.comuna = $${idx++}`);        params.push(filtros.comuna); }
+    if (filtros.barrio)       { condiciones.push(`p.barrio ILIKE $${idx++}`);     params.push(`%${filtros.barrio}%`); }
+    if (filtros.cuadrante_id) { condiciones.push(`p.cuadrante_id = $${idx++}`);   params.push(filtros.cuadrante_id); }
 
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
     const sql = `
@@ -81,11 +76,11 @@ class Persona {
   static async actualizar(id, datos) {
     const campos = [];
     const params = [];
-    let idx = 1;
+    let   idx    = 1;
 
     const camposPermitidos = [
-      'nombre','cedula','telefono','direccion',
-      'comuna','barrio','latitud','longitud','vota_pacto'
+      'nombre', 'cedula', 'telefono', 'correo', 'direccion',
+      'municipio', 'comuna', 'barrio', 'latitud', 'longitud'
     ];
 
     for (const campo of camposPermitidos) {
@@ -131,38 +126,39 @@ class Persona {
         try {
           const lat = parseFloat(p.latitud);
           const lon = parseFloat(p.longitud);
-
           if (isNaN(lat) || isNaN(lon)) {
             resultados.errores.push({ persona: p, error: 'Coordenadas inválidas' });
             continue;
           }
 
-          // Cast explícito ::numeric en todos los usos de lat/lon
           const sql = `
             INSERT INTO personas (
-              nombre, cedula, telefono, direccion,
-              comuna, barrio, latitud, longitud, vota_pacto, geom, cuadrante_id
+              nombre, cedula, telefono, correo, direccion,
+              municipio, comuna, barrio,
+              latitud, longitud, vota_pacto, geom, cuadrante_id
             )
             VALUES (
-              $1, $2, $3, $4, $5, $6,
-              $7::numeric, $8::numeric,
-              $9,
-              ST_SetSRID(ST_MakePoint($8::numeric, $7::numeric), 4326),
+              $1, $2, $3, $4, $5, $6, $7, $8,
+              $9::numeric, $10::numeric,
+              TRUE,
+              ST_SetSRID(ST_MakePoint($10::numeric, $9::numeric), 4326),
               (
                 SELECT c.id FROM cuadrantes c
-                WHERE ST_Contains(c.geom, ST_SetSRID(ST_MakePoint($8::numeric, $7::numeric), 4326))
+                WHERE ST_Contains(c.geom, ST_SetSRID(ST_MakePoint($10::numeric, $9::numeric), 4326))
                 LIMIT 1
               )
             )
             ON CONFLICT (cedula) DO UPDATE SET
               nombre       = EXCLUDED.nombre,
               telefono     = EXCLUDED.telefono,
+              correo       = EXCLUDED.correo,
               direccion    = EXCLUDED.direccion,
+              municipio    = EXCLUDED.municipio,
               comuna       = EXCLUDED.comuna,
               barrio       = EXCLUDED.barrio,
               latitud      = EXCLUDED.latitud,
               longitud     = EXCLUDED.longitud,
-              vota_pacto   = EXCLUDED.vota_pacto,
+              vota_pacto   = TRUE,
               geom         = EXCLUDED.geom,
               cuadrante_id = EXCLUDED.cuadrante_id,
               updated_at   = NOW()
@@ -170,9 +166,9 @@ class Persona {
           `;
           const res = await client.query(sql, [
             p.nombre, String(p.cedula).replace(/\D/g, ''),
-            p.telefono || null, p.direccion || null,
-            p.comuna || null, p.barrio || null,
-            lat, lon, Boolean(p.vota_pacto)
+            p.telefono  || null, p.correo    || null, p.direccion || null,
+            p.municipio || null, p.comuna    || null, p.barrio    || null,
+            lat, lon
           ]);
           resultados.exitosos.push(res.rows[0]);
         } catch (err) {
@@ -197,9 +193,9 @@ class Persona {
           },
           properties: {
             id: p.id, nombre: p.nombre, cedula: p.cedula,
-            telefono: p.telefono, direccion: p.direccion,
+            telefono: p.telefono, correo: p.correo,
+            direccion: p.direccion, municipio: p.municipio,
             comuna: p.comuna, barrio: p.barrio,
-            vota_pacto: p.vota_pacto,
             cuadrante: p.cuadrante_nombre,
             latitud: p.latitud, longitud: p.longitud
           }

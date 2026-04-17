@@ -14,9 +14,8 @@ const PALETA_COLORES = [
 
 class Cuadrante {
   static async generarCodigo(client) {
-    const q = client ? client.query.bind(client) : query;
-    const res = await q('SELECT COUNT(*) AS n FROM cuadrantes');
-    return `C${parseInt(res.rows[0].n) + 1}`;
+    // No se autogenera código — se guarda null si el usuario no lo provee
+    return null;
   }
 
   static colorAuto(idx) {
@@ -40,9 +39,8 @@ class Cuadrante {
   // ── Crear cuadrante individual ──────────────────────────────
   static async crear({ nombre, codigo, comuna, barrio, descripcion, color, geojson_geom }) {
     return withTransaction(async (client) => {
-      const codigoFinal = (codigo && codigo.trim())
-        ? codigo.trim().toUpperCase()
-        : await this.generarCodigo(client);
+      // Código solo si el usuario lo provee — nunca autogenerar
+      const codigoFinal = (codigo && codigo.trim()) ? codigo.trim().toUpperCase() : null;
 
       // Color: prioridad → color explícito → color del barrio → color automático
       let colorFinal = color;

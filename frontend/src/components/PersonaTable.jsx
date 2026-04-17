@@ -20,7 +20,6 @@ export default function PersonaTable({ onEdit }) {
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState({
     busqueda:   '',
-    vota_pacto: '',
     comuna:     ''
   });
   const [deleteModal, setDeleteModal] = useState(null); // { id, nombre }
@@ -58,8 +57,6 @@ export default function PersonaTable({ onEdit }) {
 
   // Filtrado en cliente sobre los datos ya cargados
   const filtradas = personas.filter(p => {
-    if (filtros.vota_pacto === 'true'  && !p.vota_pacto) return false;
-    if (filtros.vota_pacto === 'false' &&  p.vota_pacto) return false;
     if (filtros.comuna && p.comuna !== filtros.comuna)   return false;
     if (filtros.busqueda) {
       const q = filtros.busqueda.toLowerCase();
@@ -100,16 +97,6 @@ export default function PersonaTable({ onEdit }) {
           ))}
         </select>
 
-        <select
-          value={filtros.vota_pacto}
-          onChange={e => setFiltros(f => ({ ...f, vota_pacto: e.target.value }))}
-          className="filter-select"
-        >
-          <option value="">Todos los votantes</option>
-          <option value="true">✅ Solo Pacto</option>
-          <option value="false">❌ Solo No-Pacto</option>
-        </select>
-
         <button onClick={cargar} className="btn-secondary" title="Recargar">
           🔄
         </button>
@@ -130,7 +117,7 @@ export default function PersonaTable({ onEdit }) {
               <th>Comuna</th>
               <th>Cuadrante</th>
               <th>Coordenadas</th>
-              <th>Pacto</th>
+              
               <th>Acciones</th>
             </tr>
           </thead>
@@ -160,11 +147,6 @@ export default function PersonaTable({ onEdit }) {
                     {p.latitud && p.longitud
                       ? `${parseFloat(p.latitud).toFixed(4)}, ${parseFloat(p.longitud).toFixed(4)}`
                       : '-'}
-                  </td>
-                  <td>
-                    <span className={`badge ${p.vota_pacto ? 'badge-green' : 'badge-red'}`}>
-                      {p.vota_pacto ? '✅ Sí' : '❌ No'}
-                    </span>
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '4px' }}>

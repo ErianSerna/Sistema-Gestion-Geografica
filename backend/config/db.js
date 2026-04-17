@@ -4,24 +4,23 @@
 
 const { Pool } = require('pg');
 
-/*const pool = new Pool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     parseInt(process.env.DB_PORT) || 5432,
-  database: process.env.DB_NAME     || 'medellin_electoral',
-  user:     process.env.DB_USER     || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000
-}); */
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: false // 👈 porque vamos a usar INTERNAL URL
-});
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }  // Render requiere SSL
+      }
+    : {
+        host:     process.env.DB_HOST     || 'localhost',
+        port:     parseInt(process.env.DB_PORT) || 5432,
+        database: process.env.DB_NAME     || 'medellin_electoral',
+        user:     process.env.DB_USER     || 'postgres',
+        password: process.env.DB_PASSWORD || 'postgres',
+        ssl: process.env.DB_HOST?.includes('render.com') 
+          ? { rejectUnauthorized: false }  // Render requiere SSL
+          : false                           // Local sin SSL
+      }
+);
 
 console.log("DATABASE_URL:", process.env.DATABASE_URL ? "OK" : "NO EXISTE");
 
