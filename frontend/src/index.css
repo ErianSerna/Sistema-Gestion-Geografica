@@ -1,0 +1,139 @@
+/* ============================================================
+   frontend/src/index.css — Estilos de la aplicación
+   ============================================================ */
+
+:root {
+  --verde-pacto:    #2C9A5E;
+  --rojo-no-pacto:  #E54B4B;
+  --azul-mapa:      #2563EB;
+  --bg-primary:     #FFFFFF;
+  --bg-secondary:   #F8F7F4;
+  --text-primary:   #1C1C1A;
+  --text-secondary: #6B6B67;
+  --border:         rgba(0,0,0,0.1);
+  --radius:         8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-secondary); color: var(--text-primary); }
+
+/* ── Layout ────────────────────────────────────────────── */
+.app-container { display: flex; flex-direction: column; height: 100vh; }
+.app-header    { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--bg-primary); border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+.app-main      { flex: 1; overflow: hidden; }
+.app-main > *  { height: 100%; }
+
+.header-brand  { display: flex; align-items: center; gap: 10px; }
+.header-icon   { font-size: 24px; }
+.header-brand h1 { font-size: 16px; font-weight: 500; }
+.header-brand p  { font-size: 12px; color: var(--text-secondary); }
+
+/* ── Tabs ──────────────────────────────────────────────── */
+.tab-nav  { display: flex; gap: 4px; margin-left: auto; }
+.tab-btn  { padding: 6px 14px; border-radius: var(--radius); border: 0.5px solid var(--border); background: transparent; cursor: pointer; font-size: 13px; color: var(--text-secondary); transition: all 0.15s; }
+.tab-btn:hover  { background: var(--bg-secondary); color: var(--text-primary); }
+.tab-btn.active { background: var(--text-primary); color: white; border-color: var(--text-primary); }
+
+/* ── Botones ───────────────────────────────────────────── */
+.btn-primary   { padding: 7px 16px; border-radius: var(--radius); border: none; background: var(--text-primary); color: white; cursor: pointer; font-size: 13px; font-weight: 500; transition: opacity 0.15s; }
+.btn-primary:hover   { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary--active { background: #DC2626 !important; }
+.btn-secondary { padding: 7px 14px; border-radius: var(--radius); border: 0.5px solid var(--border); background: transparent; cursor: pointer; font-size: 13px; transition: background 0.15s; }
+.btn-secondary:hover  { background: var(--bg-secondary); }
+.btn-icon      { padding: 4px 8px; border-radius: 6px; border: 0.5px solid var(--border); background: transparent; cursor: pointer; font-size: 14px; }
+.btn-icon--danger:hover { background: #FEE2E2; }
+
+/* ── Mapa ──────────────────────────────────────────────── */
+.map-toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 8px; background: white; padding: 8px 12px; border-radius: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.12); }
+.map-legend  { position: absolute; bottom: 30px; left: 12px; z-index: 1000; background: white; padding: 10px 14px; border-radius: var(--radius); box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 12px; }
+.legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.pin-dot     { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.cuadrante-square { width: 14px; height: 10px; background: rgba(37,99,235,0.12); border: 1.5px solid #2563EB; display: inline-block; border-radius: 2px; }
+
+.filter-select { padding: 5px 10px; border-radius: var(--radius); border: 0.5px solid var(--border); font-size: 13px; background: white; }
+.filter-input  { padding: 5px 10px; border-radius: var(--radius); border: 0.5px solid var(--border); font-size: 13px; min-width: 180px; }
+.loading-badge { font-size: 12px; color: var(--text-secondary); padding: 4px 8px; background: var(--bg-secondary); border-radius: 12px; }
+
+/* ── Modal ─────────────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal-content { background: white; border-radius: 12px; padding: 24px; max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; }
+
+/* ── Formulario ────────────────────────────────────────── */
+.persona-form  { }
+.form-grid     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.form-field    { display: flex; flex-direction: column; gap: 4px; }
+.form-field--full { grid-column: 1 / -1; }
+.form-field label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.form-field input, .form-field select { padding: 8px 10px; border-radius: var(--radius); border: 0.5px solid var(--border); font-size: 14px; background: var(--bg-secondary); transition: border 0.15s; }
+.form-field input:focus, .form-field select:focus { outline: none; border-color: var(--azul-mapa); background: white; }
+.form-error    { font-size: 11px; color: var(--rojo-no-pacto); }
+.checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.form-actions  { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── Tabla ─────────────────────────────────────────────── */
+.table-container { padding: 16px; height: 100%; overflow-y: auto; }
+.table-toolbar   { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.count-badge     { font-size: 12px; color: var(--text-secondary); padding: 4px 10px; background: var(--bg-secondary); border-radius: 12px; margin-left: auto; }
+.data-table      { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th   { text-align: left; padding: 8px 12px; border-bottom: 0.5px solid var(--border); font-weight: 500; color: var(--text-secondary); font-size: 12px; background: var(--bg-secondary); position: sticky; top: 0; }
+.data-table td   { padding: 8px 12px; border-bottom: 0.5px solid var(--border); }
+.data-table tr:hover td { background: var(--bg-secondary); }
+
+.badge         { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+.badge-green   { background: #D1FAE5; color: #065F46; }
+.badge-red     { background: #FEE2E2; color: #991B1B; }
+
+/* ── Stats ─────────────────────────────────────────────── */
+.stats-panel    { padding: 20px; height: 100%; overflow-y: auto; }
+.stats-panel h2 { margin-bottom: 16px; font-size: 20px; font-weight: 500; }
+.kpi-grid       { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.kpi-card       { background: var(--bg-secondary); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.kpi-card--green { background: #D1FAE5; }
+.kpi-label      { font-size: 12px; color: var(--text-secondary); }
+.kpi-value      { font-size: 28px; font-weight: 500; }
+.progress-bar-container { margin-bottom: 20px; }
+.progress-labels { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.progress-bar   { height: 12px; background: #FEE2E2; border-radius: 6px; overflow: hidden; }
+.progress-fill  { height: 100%; background: var(--verde-pacto); border-radius: 6px; transition: width 0.5s; }
+.mini-progress  { height: 6px; background: #FEE2E2; border-radius: 3px; overflow: hidden; }
+.mini-progress div { height: 100%; border-radius: 3px; }
+.stats-tabs     { display: flex; gap: 4px; margin-bottom: 16px; }
+
+/* ── Excel Panel ───────────────────────────────────────── */
+.excel-panel    { padding: 24px; max-width: 900px; margin: 0 auto; }
+.excel-panel h2 { font-size: 22px; font-weight: 500; margin-bottom: 6px; }
+.panel-desc     { color: var(--text-secondary); margin-bottom: 20px; }
+.excel-cards    { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.excel-card     { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+.excel-card-icon { font-size: 28px; }
+.excel-card h3  { font-size: 16px; font-weight: 500; }
+.excel-card p   { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.columns-hint   { background: var(--bg-secondary); border-radius: 6px; padding: 10px; font-size: 12px; }
+.columns-hint code { display: block; font-family: monospace; margin: 4px 0; color: var(--azul-mapa); }
+.upload-btn     { display: block; text-align: center; padding: 10px; background: var(--azul-mapa); color: white; border-radius: var(--radius); cursor: pointer; font-size: 13px; margin-top: auto; }
+.upload-btn.disabled { opacity: 0.6; cursor: not-allowed; }
+.import-result  { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px; }
+.result-stats   { display: flex; gap: 12px; margin: 12px 0; }
+.stat-item      { flex: 1; text-align: center; padding: 10px; border-radius: var(--radius); }
+.stat-item.success { background: #D1FAE5; }
+.stat-item.info    { background: #DBEAFE; }
+.stat-item.warn    { background: #FEF3C7; }
+.stat-num       { display: block; font-size: 24px; font-weight: 500; }
+.stat-lbl       { font-size: 11px; color: var(--text-secondary); }
+.error-list     { font-size: 12px; color: #B45309; padding-left: 20px; margin-top: 6px; }
+.loading-state  { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); }
+
+/* ── Cuadrantes Panel ──────────────────────────────────── */
+.cuadrantes-panel       { padding: 24px; max-width: 1000px; margin: 0 auto; height: 100%; overflow-y: auto; }
+.cuadrantes-panel h2    { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
+.panel-header           { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 16px; }
+.cuadrante-form-card    { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+
+/* ── Capas KML ─────────────────────────────────────────────── */
+.kml-layers-panel   { position:absolute; top:56px; right:12px; z-index:1000; background:white; border-radius:var(--radius); box-shadow:0 2px 12px rgba(0,0,0,0.12); padding:10px 12px; min-width:200px; max-width:260px; }
+.kml-layer-item     { display:flex; align-items:center; gap:6px; padding:3px 0; }
+.kml-color-dot      { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.kml-layer-name     { flex:1; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kml-btn            { padding:2px 5px; border-radius:4px; border:0.5px solid var(--border); background:transparent; cursor:pointer; font-size:12px; flex-shrink:0; }
+.kml-btn--danger:hover { background:#FEE2E2; }
