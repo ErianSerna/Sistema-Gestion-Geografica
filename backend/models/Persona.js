@@ -4,12 +4,20 @@
 
 const { query, withTransaction } = require('../config/db');
 
+function normalizarBarrio(barrio) {
+  if (!barrio || !String(barrio).trim()) return barrio || null;
+  return String(barrio).trim()
+    .toLowerCase()
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
 class Persona {
   static async crear(datos) {
     const {
       nombre, cedula, telefono, correo, direccion,
-      municipio, comuna, barrio, latitud, longitud
+      municipio, comuna, latitud, longitud
     } = datos;
+    const barrio = normalizarBarrio(datos.barrio);
 
     const sql = `
       INSERT INTO personas (
@@ -85,8 +93,9 @@ class Persona {
 
     for (const campo of camposPermitidos) {
       if (datos[campo] !== undefined) {
+        const valor = campo === 'barrio' ? normalizarBarrio(datos[campo]) : datos[campo];
         campos.push(`${campo} = $${idx++}`);
-        params.push(datos[campo]);
+        params.push(valor);
       }
     }
 
@@ -167,7 +176,7 @@ class Persona {
           const res = await client.query(sql, [
             p.nombre, String(p.cedula).replace(/\D/g, ''),
             p.telefono  || null, p.correo    || null, p.direccion || null,
-            p.municipio || null, p.comuna    || null, p.barrio    || null,
+            p.municipio || null, p.comuna    || null, normalizarBarrio(p.barrio),
             lat, lon
           ]);
           resultados.exitosos.push(res.rows[0]);

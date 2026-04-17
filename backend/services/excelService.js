@@ -11,9 +11,10 @@ const Persona = require('../models/Persona');
 // El export y la plantilla usan EXACTAMENTE estas cabeceras.
 // El import las acepta en minúsculas, con o sin tilde, y en inglés.
 const COLUMNAS_EXPORT = [
-  'nombre', 'cedula', 'telefono', 'direccion',
-  'comuna', 'barrio', 'latitud', 'longitud',
-  'vota_pacto', 'cuadrante', 'fecha_registro'
+  'nombre', 'cedula', 'telefono', 'correo',
+  'comuna', 'barrio', 'direccion',
+  'latitud', 'longitud',
+  'municipio', 'cuadrante', 'fecha_registro'
 ];
 
 // Variantes aceptadas por columna al importar (todo en minúsculas)
@@ -21,13 +22,15 @@ const COLUMNAS_MAPA = {
   nombre:    ['nombre', 'name', 'nombres'],
   cedula:    ['cedula', 'cédula', 'cc', 'documento', 'id', 'cedula/id'],
   telefono:  ['telefono', 'teléfono', 'phone', 'celular', 'cel', 'tel'],
-  direccion: ['direccion', 'dirección', 'address', 'dir'],
+  correo:    ['correo', 'email', 'e-mail', 'mail'],
   comuna:    ['comuna', 'commune'],
   barrio:    ['barrio', 'neighborhood', 'sector'],
-  vota_pacto:['vota_pacto', 'vota', 'pacto', 'votante', 'vota pacto',
-              'vota pacto histórico', 'vota pacto historico'],
+  direccion: ['direccion', 'dirección', 'address', 'dir'],
   latitud:   ['latitud', 'lat', 'latitude'],
   longitud:  ['longitud', 'lon', 'lng', 'longitude'],
+  municipio: ['municipio', 'municipality', 'ciudad', 'city'],
+  vota_pacto:['vota_pacto', 'vota', 'pacto', 'votante', 'vota pacto',
+              'vota pacto histórico', 'vota pacto historico'],
 };
 
 function normalizarColumna(nombre) {
@@ -164,12 +167,13 @@ function exportarAExcel(personas) {
     nombre:      p.nombre        || '',
     cedula:      p.cedula        || '',
     telefono:    p.telefono      || '',
-    direccion:   p.direccion     || '',
+    correo:      p.correo        || '',
     comuna:      p.comuna        || '',
     barrio:      p.barrio        || '',
+    direccion:   p.direccion     || '',
     latitud:     p.latitud != null ? parseFloat(p.latitud)  : '',
     longitud:    p.longitud != null ? parseFloat(p.longitud) : '',
-    vota_pacto:  p.vota_pacto ? 'si' : 'no',   // ← valores que el importador reconoce
+    municipio:   p.municipio     || '',
     cuadrante:   p.cuadrante_nombre || '',
     fecha_registro: p.created_at
       ? new Date(p.created_at).toLocaleDateString('es-CO')
@@ -179,9 +183,9 @@ function exportarAExcel(personas) {
   const workbook = XLSX.utils.book_new();
   const hoja = XLSX.utils.json_to_sheet(filas, { header: COLUMNAS_EXPORT });
   hoja['!cols'] = [
-    {wch:30},{wch:15},{wch:15},{wch:40},
-    {wch:15},{wch:20},{wch:12},{wch:12},
-    {wch:12},{wch:20},{wch:18}
+    {wch:30},{wch:15},{wch:15},{wch:30},
+    {wch:15},{wch:20},{wch:40},{wch:12},
+    {wch:12},{wch:15},{wch:20},{wch:18}
   ];
   XLSX.utils.book_append_sheet(workbook, hoja, 'Votantes');
 
@@ -209,41 +213,43 @@ function exportarAExcel(personas) {
 function generarPlantilla() {
   // Mismas cabeceras que el export para 100 % compatibilidad
   const ejemplo = [{
-    nombre:    'Juan García',
-    cedula:    '1234567890',
-    telefono:  '3001234567',
-    direccion: 'Carrera 50 # 45-20',
-    comuna:    'Laureles',
-    barrio:    'Estadio',
-    latitud:   6.2518,
-    longitud:  -75.5636,
-    vota_pacto:'si',   // Valores: si / no
-    cuadrante: '',     // Solo lectura — se ignora al importar
-    fecha_registro: '', // Solo lectura — se ignora al importar
+    nombre:         'Juan García',
+    cedula:         '1234567890',
+    telefono:       '3001234567',
+    correo:         'ejemplo@correo.com',
+    comuna:         'Laureles',
+    barrio:         'Estadio',
+    direccion:      'Carrera 50 # 45-20',
+    latitud:        6.2518,
+    longitud:       -75.5636,
+    municipio:      'Medellín',
+    cuadrante:      '',     // Solo lectura — se ignora al importar
+    fecha_registro: '',     // Solo lectura — se ignora al importar
   }];
 
   const workbook = XLSX.utils.book_new();
   const hoja = XLSX.utils.json_to_sheet(ejemplo, { header: COLUMNAS_EXPORT });
   hoja['!cols'] = [
-    {wch:30},{wch:15},{wch:15},{wch:40},
-    {wch:15},{wch:20},{wch:12},{wch:12},
-    {wch:12},{wch:20},{wch:18}
+    {wch:30},{wch:15},{wch:15},{wch:30},
+    {wch:15},{wch:20},{wch:40},{wch:12},
+    {wch:12},{wch:15},{wch:20},{wch:18}
   ];
   XLSX.utils.book_append_sheet(workbook, hoja, 'Plantilla');
 
   // Hoja de instrucciones
   const instrucciones = [
-    { columna: 'nombre',       descripcion: 'Nombre completo',         requerido: 'Sí' },
-    { columna: 'cedula',       descripcion: 'Número de cédula',        requerido: 'Sí' },
-    { columna: 'telefono',     descripcion: 'Número de teléfono',      requerido: 'No' },
-    { columna: 'direccion',    descripcion: 'Dirección del domicilio', requerido: 'Si no hay lat/lon' },
-    { columna: 'comuna',       descripcion: 'Comuna de Medellín',      requerido: 'No' },
-    { columna: 'barrio',       descripcion: 'Barrio',                  requerido: 'No' },
-    { columna: 'latitud',      descripcion: 'Latitud WGS84',           requerido: 'Si no hay dirección' },
-    { columna: 'longitud',     descripcion: 'Longitud WGS84',          requerido: 'Si no hay dirección' },
-    { columna: 'vota_pacto',   descripcion: 'Vota Pacto: si / no',    requerido: 'No (default: no)' },
-    { columna: 'cuadrante',    descripcion: 'Solo lectura (ignorado)', requerido: 'No' },
-    { columna: 'fecha_registro',descripcion:'Solo lectura (ignorado)', requerido: 'No' },
+    { columna: 'nombre',        descripcion: 'Nombre completo',         requerido: 'Sí' },
+    { columna: 'cedula',        descripcion: 'Número de cédula',        requerido: 'Sí' },
+    { columna: 'telefono',      descripcion: 'Número de teléfono',      requerido: 'No' },
+    { columna: 'correo',        descripcion: 'Correo electrónico',      requerido: 'No' },
+    { columna: 'comuna',        descripcion: 'Comuna de Medellín',      requerido: 'No' },
+    { columna: 'barrio',        descripcion: 'Barrio',                  requerido: 'No' },
+    { columna: 'direccion',     descripcion: 'Dirección del domicilio', requerido: 'Si no hay lat/lon' },
+    { columna: 'latitud',       descripcion: 'Latitud WGS84',           requerido: 'Si no hay dirección' },
+    { columna: 'longitud',      descripcion: 'Longitud WGS84',          requerido: 'Si no hay dirección' },
+    { columna: 'municipio',     descripcion: 'Municipio',               requerido: 'No' },
+    { columna: 'cuadrante',     descripcion: 'Solo lectura (ignorado)', requerido: 'No' },
+    { columna: 'fecha_registro',descripcion: 'Solo lectura (ignorado)', requerido: 'No' },
   ];
   const hojaI = XLSX.utils.json_to_sheet(instrucciones);
   hojaI['!cols'] = [{wch:18},{wch:35},{wch:25}];
