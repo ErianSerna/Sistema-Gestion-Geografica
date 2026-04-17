@@ -23,6 +23,13 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
 .app-main      { flex: 1; overflow: hidden; }
 .app-main > *  { height: 100%; }
 
+.header-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  margin-right: 10px;
+}
+
 .header-brand  { display: flex; align-items: center; gap: 10px; }
 .header-icon   { font-size: 24px; }
 .header-brand h1 { font-size: 16px; font-weight: 500; }
