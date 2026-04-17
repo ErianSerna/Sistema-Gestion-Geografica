@@ -64,7 +64,9 @@ export default function PersonaTable({ onEdit }) {
         (p.nombre  || '').toLowerCase().includes(q) ||
         (p.cedula  || '').toLowerCase().includes(q) ||
         (p.barrio  || '').toLowerCase().includes(q) ||
-        (p.direccion || '').toLowerCase().includes(q)
+        (p.direccion || '').toLowerCase().includes(q) ||
+        (p.correo  || '').toLowerCase().includes(q) ||
+        (p.municipio || '').toLowerCase().includes(q)
       );
     }
     return true;
@@ -112,9 +114,11 @@ export default function PersonaTable({ onEdit }) {
               <th>Nombre</th>
               <th>Cédula</th>
               <th>Teléfono</th>
+              <th>Correo</th>
               <th>Dirección</th>
               <th>Barrio</th>
               <th>Comuna</th>
+              <th>Municipio</th>
               <th>Cuadrante</th>
               <th>Coordenadas</th>
               
@@ -124,7 +128,7 @@ export default function PersonaTable({ onEdit }) {
           <tbody>
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
+                <td colSpan={12} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
                   {personas.length === 0
                     ? 'No hay personas registradas aún. Agrega pins en el mapa o importa un Excel.'
                     : 'Ningún registro coincide con los filtros aplicados.'}
@@ -136,12 +140,17 @@ export default function PersonaTable({ onEdit }) {
                   <td style={{ fontWeight: 500 }}>{p.nombre}</td>
                   <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{p.cedula}</td>
                   <td>{p.telefono || '-'}</td>
+                  <td style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={p.correo}>
+                    {p.correo || '-'}
+                  </td>
                   <td style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                       title={p.direccion}>
                     {p.direccion || '-'}
                   </td>
                   <td>{p.barrio || '-'}</td>
                   <td>{p.comuna || '-'}</td>
+                  <td>{p.municipio || '-'}</td>
                   <td>{p.cuadrante_nombre || <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Sin asignar</span>}</td>
                   <td style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
                     {p.latitud && p.longitud
