@@ -459,9 +459,9 @@ export default function CuadrantesPanel() {
                             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'2px' }}>
                               <input
                                 type="color"
-                                value={colorBarrio}
-                                onChange={e => cambiarColorBarrio(barrio, e.target.value)}
-                                title={`Color del barrio "${barrio}" (cambia todos)`}
+                                defaultValue={colorBarrio}
+                                onBlur={e => cambiarColorBarrio(barrio, e.target.value)}
+                                title={`Color del barrio "${barrio}" (cambia todos) — suelta el picker para aplicar`}
                                 style={{ width:'28px', height:'28px', border:'2px solid #94A3B8', borderRadius:'5px', cursor:'pointer', padding:'1px', background:'none' }}
                               />
                               {items.length > 1 && (
@@ -473,9 +473,9 @@ export default function CuadrantesPanel() {
                           ) : (
                             <input
                               type="color"
-                              value={p.color || '#2563EB'}
-                              onChange={e => cambiarColor(p.id, e.target.value)}
-                              title="Cambiar color individual"
+                              defaultValue={p.color || '#2563EB'}
+                              onBlur={e => cambiarColor(p.id, e.target.value)}
+                              title="Cambiar color individual — suelta el picker para aplicar"
                               style={{ width:'28px', height:'28px', border:'none', borderRadius:'4px', cursor:'pointer', padding:'2px', background:'none' }}
                             />
                           )}
