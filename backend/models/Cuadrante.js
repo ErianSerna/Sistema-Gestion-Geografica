@@ -6,10 +6,79 @@
 const { query, withTransaction } = require('../config/db');
 
 // Paleta de colores para auto-asignar al importar GeoJSON
+// 60 colores variados: azules, verdes, rojos, naranjas, púrpuras, rosas,
+// cianes, magentas, indigos, limas, marrones — buena separación visual entre barrios
 const PALETA_COLORES = [
-  '#2563EB','#7C3AED','#0891B2','#D97706','#059669',
-  '#DC2626','#DB2777','#65A30D','#EA580C','#0D9488',
-  '#7C2D12','#1D4ED8','#6D28D9','#0E7490','#B45309',
+  // Azules vibrantes
+  '#1D4ED8','#2563EB','#3B82F6','#60A5FA','#93C5FD','#BFDBFE',
+  // Azules oscuros / navy
+  '#1E3A5F','#1A3A6B','#0C2461','#0A1931','#1B2A4A','#253B6E',
+  // Azules acero
+  '#4682B4','#5F9EA0','#4169E1','#6495ED','#4A90D9','#356FA0',
+  // Cianes brillantes
+  '#06B6D4','#0891B2','#0E7490','#22D3EE','#67E8F9','#00BCD4',
+  // Cianes oscuros
+  '#155E75','#164E63','#0F4C5C','#006978','#00838F','#00695C',
+  // Teales / aqua
+  '#0D9488','#0F766E','#134E4A','#009688','#00796B','#00897B',
+  // Verdes lima
+  '#84CC16','#65A30D','#4D7C0F','#A3E635','#BEF264','#ECFCCB',
+  // Verdes medios
+  '#22C55E','#16A34A','#15803D','#4ADE80','#86EFAC','#166534',
+  // Verdes oscuros / bosque
+  '#166534','#14532D','#1A4731','#1E5631','#2D6A4F','#1B4332',
+  // Verdes oliva
+  '#556B2F','#4B5320','#6B7C00','#3F6212','#5F7A00','#8B8C00',
+  // Amarillos / dorados
+  '#F59E0B','#D97706','#B45309','#FBBF24','#FCD34D','#FDE68A',
+  // Naranjas vibrantes
+  '#F97316','#EA580C','#C2410C','#FB923C','#FD8B3A','#FF6B35',
+  // Naranjas oscuros / tostados
+  '#92400E','#78350F','#7C2D12','#A05000','#8B4513','#6B3A2A',
+  // Rojos
+  '#EF4444','#DC2626','#B91C1C','#991B1B','#7F1D1D','#C53030',
+  // Rojos rosados / carmesí
+  '#F43F5E','#E11D48','#BE123C','#9F1239','#881337','#C0392B',
+  // Rosas
+  '#EC4899','#DB2777','#BE185D','#9D174D','#F472B6','#F9A8D4',
+  // Fucsias / magentas
+  '#D946EF','#C026D3','#A21CAF','#86198F','#E879F9','#F0ABFC',
+  // Violetas / orquídeas
+  '#9333EA','#7C3AED','#6D28D9','#5B21B6','#A855F7','#C084FC',
+  // Púrpuras medios
+  '#8B5CF6','#7C3AED','#6D28D9','#4C1D95','#6A0DAD','#7B2FBE',
+  // Púrpuras oscuros
+  '#4C1D95','#3B0764','#2D1B69','#1A0A3B','#2E003E','#3C0063',
+  // Índigos
+  '#6366F1','#4F46E5','#4338CA','#3730A3','#312E81','#1E1B4B',
+  // Azul pizarra
+  '#475569','#334155','#1E293B','#607D8B','#546E7A','#455A64',
+  // Grises azulados (útiles para contraste)
+  '#4B5563','#374151','#1F2937','#6B7280','#9CA3AF','#52606D',
+  // Marrones / chocolates
+  '#713F12','#7C2D12','#92400E','#78350F','#6D4C41','#5D4037',
+  // Marrones medios / tierra
+  '#A16207','#854D0E','#A0522D','#8B4513','#795548','#6D4B33',
+  // Sienas / terracota
+  '#C0643C','#B5522D','#A94A2A','#C1440E','#D2691E','#CD853F',
+  // Oro / bronce
+  '#B8860B','#DAA520','#CD7F32','#C5A028','#B7950B','#A0790A',
+  // Verde musgo / natural
+  '#3B5323','#355E3B','#2E4A1E','#4A5E2A','#3D5A27','#2F4A1F',
+  // Verde salvia / menta
+  '#7CB9A0','#6AAF92','#5DA08A','#52917C','#4A7D6A','#3D6B59',
+  // Azul marino / medianoche
+  '#003153','#002147','#001F3F','#002366','#00356B','#024680',
+  // Cereza / vino
+  '#722F37','#800020','#8B0000','#9B1B30','#A52A2A','#6B2737',
+  // Lavanda / lila
+  '#967BB6','#8A6CB5','#7B5EA7','#6C4F9A','#8E7AB5','#9B89C4',
+  // Coral / salmón
+  '#FF6B6B','#FF7F7F','#FA8072','#E88080','#D46A6A','#C75C5C',
+  // Turquesa / jade
+  '#40E0D0','#30D5C8','#00CED1','#20B2AA','#48D1CC','#00B2A9',
+  // Cian eléctrico
+  '#00FFFF','#00E5FF','#00B4D8','#0096C7','#0077B6','#023E8A',
 ];
 
 class Cuadrante {

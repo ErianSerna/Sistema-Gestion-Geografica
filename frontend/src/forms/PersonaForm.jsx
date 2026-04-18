@@ -2,7 +2,7 @@
 // frontend/src/forms/PersonaForm.jsx
 // ============================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -19,12 +19,32 @@ const FORM_VACIO = {
   latitud: '', longitud: ''
 };
 
+// Evalúa si la dirección es demasiado ambigua (solo "Cra 50" sin número)
+function esAmbigua(dir) {
+  if (!dir) return false;
+  const sinNumero = /^(carrera|calle|cra|cl|av|avenida|transversal|tv|diagonal|dg)\.?\s+\d+\s*$/i;
+  return sinNumero.test(dir.trim());
+}
+
+// Etiqueta legible de precisión
+function etiquetaConfianza(conf, tipo) {
+  if (!conf && conf !== 0) return null;
+  const tiposExactos = ['house', 'building', 'road', 'residential'];
+  if (conf >= 0.7 && tiposExactos.includes(tipo)) return { texto: 'Alta precisión', color: '#16a34a' };
+  if (conf >= 0.45) return { texto: 'Precisión media', color: '#d97706' };
+  return { texto: 'Baja precisión — verifica en el mapa', color: '#dc2626' };
+}
+
 export default function PersonaForm({ modo, persona, coordInicial, onGuardado, onCancelar }) {
-  const [form,           setForm]           = useState(FORM_VACIO);
-  const [geocodificando, setGeocodificando] = useState(false);
-  const [guardando,      setGuardando]      = useState(false);
-  const [errores,        setErrores]        = useState({});
-  const [geoStatus,      setGeoStatus]      = useState('');
+  const [form,             setForm]             = useState(FORM_VACIO);
+  const [geocodificando,   setGeocodificando]   = useState(false);
+  const [guardando,        setGuardando]         = useState(false);
+  const [errores,          setErrores]          = useState({});
+  const [geoStatus,        setGeoStatus]        = useState('');
+  const [geoInfo,          setGeoInfo]          = useState(null);   // { confidence, tipo, advertencia }
+  const [candidatos,       setCandidatos]        = useState([]);     // múltiples resultados
+  const [mostraSugerencia, setMostraSugerencia] = useState(false);
+  const direccionRef = useRef(null);
 
   useEffect(() => {
     if (modo === 'editar' && persona) {
@@ -80,6 +100,8 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
           longitud: pos.coords.longitude.toFixed(6),
         }));
         setGeoStatus('📍 Ubicación obtenida automáticamente');
+        setGeoInfo(null);
+        setCandidatos([]);
         setTimeout(() => setGeoStatus(''), 3000);
       },
       () => setGeoStatus(''),
@@ -91,29 +113,71 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
     const { name, value } = e.target;
     setForm(f => ({ ...f, [name]: value }));
     if (errores[name]) setErrores(er => ({ ...er, [name]: null }));
+
+    // Al cambiar dirección: resetear info de geocoding y mostrar sugerencia si es ambigua
+    if (name === 'direccion') {
+      setGeoInfo(null);
+      setCandidatos([]);
+      setMostraSugerencia(esAmbigua(value));
+    }
   };
 
   const geocodificar = async () => {
     if (!form.direccion) { toast.error('Ingresa una dirección primero'); return; }
+
     setGeocodificando(true);
+    setGeoInfo(null);
+    setCandidatos([]);
+
     try {
-      const { data } = await api.get('/geocodificar', {
+      // Siempre pedir múltiples para detectar ambigüedad
+      const { data } = await api.get('/geocodificar/multiple', {
         params: { direccion: form.direccion, barrio: form.barrio }
       });
-      setForm(f => ({ ...f, latitud: data.latitud.toFixed(6), longitud: data.longitud.toFixed(6) }));
-      toast.success('📍 Ubicado correctamente');
+
+      const { resultados, ambiguo } = data;
+
+      if (!resultados || resultados.length === 0) {
+        toast.error('No se encontró la dirección. Prueba con más detalle (ej: Carrera 50 # 45-20, Laureles).');
+        return;
+      }
+
+      if (ambiguo || resultados.length > 1) {
+        // Dejar que el usuario elija
+        setCandidatos(resultados);
+        toast('Se encontraron varias ubicaciones — elige la correcta ↓', { icon: '📍', duration: 4000 });
+      } else {
+        // Un solo resultado claro: aplicar directamente
+        aplicarResultado(resultados[0]);
+      }
     } catch {
-      toast.error('No se pudo geocodificar. Intenta con más detalle.');
+      toast.error('No se pudo geocodificar. Intenta con más detalle o ingresa las coordenadas manualmente.');
     } finally {
       setGeocodificando(false);
     }
   };
 
+  const aplicarResultado = (resultado) => {
+    setForm(f => ({
+      ...f,
+      latitud:  resultado.latitud.toFixed(6),
+      longitud: resultado.longitud.toFixed(6),
+    }));
+    setGeoInfo({ confidence: resultado.confidence, tipo: resultado.tipo, advertencia: resultado.advertencia });
+    setCandidatos([]);
+
+    if (resultado.advertencia === 'baja_precision') {
+      toast('📍 Ubicado con baja precisión — verifica en el mapa', { icon: '⚠️', duration: 5000 });
+    } else {
+      toast.success('📍 Ubicado correctamente');
+    }
+  };
+
   const validar = () => {
     const e = {};
-    if (!form.nombre.trim()) e.nombre  = 'Requerido';
-    if (!form.cedula.trim()) e.cedula  = 'Requerido';
-    if (!form.latitud)       e.latitud = 'Requerido — usa "Geocodificar" o permite la ubicación';
+    if (!form.nombre.trim()) e.nombre   = 'Requerido';
+    if (!form.cedula.trim()) e.cedula   = 'Requerido';
+    if (!form.latitud)       e.latitud  = 'Requerido — usa "Geocodificar" o permite la ubicación';
     if (!form.longitud)      e.longitud = 'Requerido';
     setErrores(e);
     return Object.keys(e).length === 0;
@@ -145,8 +209,10 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
     }
   };
 
+  const labelConfianza = geoInfo ? etiquetaConfianza(geoInfo.confidence, geoInfo.tipo) : null;
+
   return (
-    <form onSubmit={guardar} className="persona-form">
+    <form onSubmit={guardar} className="persona-form" autoComplete="off">
       <h2 style={{ margin: '0 0 1.25rem', fontSize: '18px', fontWeight: 500 }}>
         {modo === 'crear' ? '➕ Nueva persona' : '✏️ Editar persona'}
       </h2>
@@ -183,19 +249,97 @@ export default function PersonaForm({ modo, persona, coordInicial, onGuardado, o
         </div>
 
         <div className="form-field">
-          <label>Barrio</label>
-          <input name="barrio" value={form.barrio} onChange={cambiar} placeholder="Estadio" />
+          <label>Barrio <span style={{ fontWeight: 400, color: '#6b7280', fontSize: '12px' }}>(mejora la precisión)</span></label>
+          <input name="barrio" value={form.barrio} onChange={cambiar} placeholder="Ej: Estadio, Laureles" />
         </div>
 
         <div className="form-field form-field--full">
-          <label>Dirección</label>
+          <label>
+            Dirección
+            <span style={{ fontWeight: 400, color: '#6b7280', fontSize: '12px', marginLeft: 6 }}>
+              (formato: Carrera 50 # 45-20)
+            </span>
+          </label>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <input name="direccion" value={form.direccion} onChange={cambiar} placeholder="Carrera 50 # 45-20" style={{ flex: 1 }} />
-            <button type="button" onClick={geocodificar} className="btn-secondary" disabled={geocodificando} style={{ whiteSpace: 'nowrap' }}>
+            <input
+              ref={direccionRef}
+              name="direccion"
+              value={form.direccion}
+              onChange={cambiar}
+              placeholder="Carrera 50 # 45-20"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              onClick={geocodificar}
+              className="btn-secondary"
+              disabled={geocodificando}
+              style={{ whiteSpace: 'nowrap' }}
+            >
               {geocodificando ? '⏳' : '📍'} Geocodificar
             </button>
           </div>
+
+          {/* Advertencia dirección ambigua */}
+          {mostraSugerencia && (
+            <p style={{ fontSize: '12px', color: '#d97706', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+              ⚠️ Dirección incompleta — agrega número (ej: <strong>Cra 50 #45-20</strong>) y barrio para mayor precisión.
+            </p>
+          )}
+
+          {/* Indicador de confianza del resultado actual */}
+          {labelConfianza && !candidatos.length && (
+            <p style={{ fontSize: '12px', color: labelConfianza.color, margin: '4px 0 0' }}>
+              🎯 {labelConfianza.texto}
+            </p>
+          )}
         </div>
+
+        {/* Selector de candidatos cuando hay ambigüedad */}
+        {candidatos.length > 0 && (
+          <div className="form-field form-field--full">
+            <label style={{ color: '#2563EB' }}>Selecciona la ubicación correcta:</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+              {candidatos.map((c, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => aplicarResultado(c)}
+                  style={{
+                    textAlign: 'left',
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1px solid #d1d5db',
+                    background: '#f9fafb',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    lineHeight: 1.4
+                  }}
+                >
+                  <strong style={{ display: 'block', marginBottom: 2 }}>
+                    {c.barrio_osm || c.ciudad_osm || c.tipo}
+                    {c.barrio_osm && c.ciudad_osm ? ` — ${c.ciudad_osm}` : ''}
+                  </strong>
+                  <span style={{ color: '#6b7280', fontSize: '12px' }}>{c.display_name}</span>
+                  <span style={{
+                    marginLeft: 8,
+                    fontSize: '11px',
+                    color: c.confidence >= 0.5 ? '#16a34a' : '#d97706'
+                  }}>
+                    {Math.round(c.confidence * 100)}% confianza
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setCandidatos([])}
+                style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0' }}
+              >
+                Cancelar selección
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="form-field">
           <label>Municipio</label>
