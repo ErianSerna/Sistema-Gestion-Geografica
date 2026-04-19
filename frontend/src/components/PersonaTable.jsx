@@ -229,25 +229,59 @@ export default function PersonaTable({ onEdit, sesion }) {
                 <td>{p.barrio || '-'}</td>
                 <td>{p.comuna || '-'}</td>
 
-                {/* Asignación manual de cuadrante */}
+                {/* Asignación manual de cuadrante — filtrado por barrio */}
                 <td>
-                  <select
-                    value={p.cuadrante_id || ''}
-                    onChange={e => asignarCuadrante(p, e.target.value)}
-                    style={{
-                      fontSize: '12px', padding: '3px 6px', borderRadius: '5px',
-                      border: '1px solid #D1D5DB', maxWidth: '140px',
-                      color: p.cuadrante_id ? 'inherit' : 'var(--text-secondary)',
-                      background: 'white',
-                    }}
-                  >
-                    <option value="">Sin asignar</option>
-                    {cuadrantes.map(f => (
-                      <option key={f.properties.id} value={f.properties.id}>
-                        {f.properties.nombre}
-                      </option>
-                    ))}
-                  </select>
+                  {(() => {
+                    // Cuadrantes del mismo barrio de la persona (filtro sugerido)
+                    const cuadBarrio = p.barrio
+                      ? cuadrantes.filter(f =>
+                          (f.properties.barrio || '').toLowerCase() === (p.barrio || '').toLowerCase()
+                        )
+                      : [];
+                    // Si hay cuadrantes del barrio, mostrarlos primero; si no, mostrar todos
+                    const listaPrincipal = cuadBarrio.length > 0 ? cuadBarrio : cuadrantes;
+                    const listaOtros     = cuadBarrio.length > 0
+                      ? cuadrantes.filter(f => !cuadBarrio.includes(f))
+                      : [];
+                    // Etiqueta: "C1 - NOMBRE EN MAYÚSCULAS"
+                    const etiqueta = (f) => {
+                      const cod = f.properties.codigo || '';
+                      const nom = (f.properties.nombre || '').toUpperCase();
+                      return cod ? `${cod} - ${nom}` : nom;
+                    };
+                    return (
+                      <select
+                        value={p.cuadrante_id || ''}
+                        onChange={e => asignarCuadrante(p, e.target.value)}
+                        title={cuadBarrio.length > 0
+                          ? `Mostrando ${cuadBarrio.length} cuadrante(s) del barrio ${p.barrio}`
+                          : 'Todos los cuadrantes'}
+                        style={{
+                          fontSize: '12px', padding: '3px 6px', borderRadius: '5px',
+                          border: `1.5px solid ${cuadBarrio.length > 0 ? '#86EFAC' : '#D1D5DB'}`,
+                          maxWidth: '190px', minWidth: '140px',
+                          color: p.cuadrante_id ? 'inherit' : 'var(--text-secondary)',
+                          background: 'white',
+                        }}
+                      >
+                        <option value="">Sin asignar</option>
+                        {listaPrincipal.map(f => (
+                          <option key={f.properties.id} value={f.properties.id}>
+                            {etiqueta(f)}
+                          </option>
+                        ))}
+                        {listaOtros.length > 0 && (
+                          <optgroup label="Otros cuadrantes">
+                            {listaOtros.map(f => (
+                              <option key={f.properties.id} value={f.properties.id}>
+                                {etiqueta(f)}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    );
+                  })()}
                 </td>
 
                 {/* Checkboxes de rol */}

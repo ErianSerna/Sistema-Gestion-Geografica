@@ -108,8 +108,32 @@ class Cuadrante {
   // ── Crear cuadrante individual ──────────────────────────────
   static async crear({ nombre, codigo, comuna, barrio, descripcion, color, geojson_geom }) {
     return withTransaction(async (client) => {
-      // Código solo si el usuario lo provee — nunca autogenerar
-      const codigoFinal = (codigo && codigo.trim()) ? codigo.trim().toUpperCase() : null;
+      // Autogenerar código: C{N}-{BARRIO_EN_MAYUSCULAS}
+      // Si el usuario provee uno, usarlo; si no, generar automáticamente
+      let codigoFinal;
+      if (codigo && codigo.trim()) {
+        codigoFinal = codigo.trim().toUpperCase();
+      } else {
+        // Obtener el próximo número consecutivo
+        const countRes2 = await client.query('SELECT COUNT(*) AS n FROM cuadrantes');
+        const n = parseInt(countRes2.rows[0].n) + 1;
+        // Sufijo: barrio en mayúsculas con espacios → guion bajo
+        const sufijo = (barrio && barrio.trim())
+          ? barrio.trim().toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '')
+          : 'SIN_BARRIO';
+        const candidato = `C${n}-${sufijo}`;
+        // Evitar duplicados: si ya existe, agregar -2, -3, etc.
+        let intentos = 0;
+        let codigoPrueba = candidato;
+        while (true) {
+          intentos++;
+          const existe = await client.query('SELECT 1 FROM cuadrantes WHERE codigo = $1', [codigoPrueba]);
+          if (!existe.rows.length) break;
+          codigoPrueba = `${candidato}-${intentos + 1}`;
+          if (intentos > 50) { codigoPrueba = `C${Date.now()}`; break; }
+        }
+        codigoFinal = codigoPrueba;
+      }
 
       // Color: prioridad → color explícito → color del barrio → color automático
       let colorFinal = color;
