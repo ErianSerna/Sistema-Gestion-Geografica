@@ -122,7 +122,7 @@ async function importarDesdeExcel(buffer) {
       if (p.direccion && String(p.direccion).trim()) {
         try {
           const coords = await geocodingService.geocodificar(
-            String(p.direccion), p.comuna || '', 'Medellín, Antioquia, Colombia'
+            String(p.direccion), p.barrio || p.comuna || '', 'Medellín, Antioquia, Colombia'
           );
           if (coords) {
             p.latitud  = coords.latitud;

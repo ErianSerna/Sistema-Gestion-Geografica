@@ -72,4 +72,37 @@ router.get('/por-cuadrante', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/estadisticas/cuadrantes-por-comuna
+router.get('/cuadrantes-por-comuna', async (req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        COALESCE(NULLIF(TRIM(comuna), ''), '(sin comuna)') AS comuna,
+        COUNT(*)::int AS total_cuadrantes
+      FROM cuadrantes
+      GROUP BY COALESCE(NULLIF(TRIM(comuna), ''), '(sin comuna)')
+      ORDER BY total_cuadrantes DESC
+    `);
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
+// GET /api/estadisticas/cuadrantes-por-barrio
+router.get('/cuadrantes-por-barrio', async (req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        COALESCE(NULLIF(TRIM(barrio), ''), '(sin barrio)') AS barrio,
+        COALESCE(NULLIF(TRIM(comuna), ''), '(sin comuna)') AS comuna,
+        COUNT(*)::int AS total_cuadrantes
+      FROM cuadrantes
+      GROUP BY
+        COALESCE(NULLIF(TRIM(barrio), ''), '(sin barrio)'),
+        COALESCE(NULLIF(TRIM(comuna), ''), '(sin comuna)')
+      ORDER BY total_cuadrantes DESC
+    `);
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
