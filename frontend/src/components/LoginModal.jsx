@@ -106,8 +106,7 @@ export default function LoginModal({ onLogin }) {
               value={usuario}
               onChange={e => { setUsuario(e.target.value); setError(''); }}
               autoFocus
-              autoComplete="username"
-              placeholder="Ej: admin"
+              autoComplete="false"
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: '8px',
                 border: error ? '1.5px solid #DC2626' : '1.5px solid #D1D5DB',
