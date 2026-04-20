@@ -9,7 +9,7 @@ import { useState } from 'react';
 // Para agregar más coordinadores, copiar una línea con rol 'coordinador'
 // y cambiar usuario, clave y comuna.
 const USUARIOS = [
-  { usuario: 'admin',     clave: 'admin2024',  rol: 'admin',       comuna: null },
+  { usuario: 'admin',     clave: 'admin2026',  rol: 'admin',       comuna: null },
   { usuario: 'comuna1',   clave: 'coord123',   rol: 'coordinador', comuna: 'Popular' },
   { usuario: 'comuna2',   clave: 'coord123',   rol: 'coordinador', comuna: 'Santa Cruz' },
   { usuario: 'comuna3',   clave: 'coord123',   rol: 'coordinador', comuna: 'Manrique' },
