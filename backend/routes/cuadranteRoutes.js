@@ -89,6 +89,30 @@ router.patch('/barrio/:barrio/color', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PATCH /api/cuadrantes/barrio/:barrio/comuna
+// Asigna masivamente una comuna a todos los cuadrantes de un barrio
+router.patch('/barrio/:barrio/comuna', async (req, res, next) => {
+  try {
+    const { comuna } = req.body;
+    if (!comuna || !String(comuna).trim())
+      return res.status(400).json({ error: 'El campo "comuna" es requerido' });
+    const n = await Cuadrante.actualizarComunaPorBarrio(req.params.barrio, String(comuna).trim());
+    res.json({
+      mensaje: `${n} cuadrantes del barrio "${req.params.barrio}" → comuna "${comuna}"`,
+      actualizados: n,
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/cuadrantes/backfill-codigos
+// Genera códigos para todos los cuadrantes que tienen codigo NULL
+router.post('/backfill-codigos', async (req, res, next) => {
+  try {
+    const n = await Cuadrante.backfillCodigos();
+    res.json({ mensaje: `${n} cuadrantes actualizados con código`, actualizados: n });
+  } catch (err) { next(err); }
+});
+
 // ─── Rutas dinámicas /:id ─────────────────────────────────────────────────────
 
 // PATCH /api/cuadrantes/:id

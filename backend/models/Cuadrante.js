@@ -108,8 +108,33 @@ class Cuadrante {
   // ── Crear cuadrante individual ──────────────────────────────
   static async crear({ nombre, codigo, comuna, barrio, descripcion, color, geojson_geom }) {
     return withTransaction(async (client) => {
-      // Código solo si el usuario lo provee — nunca autogenerar
-      const codigoFinal = (codigo && codigo.trim()) ? codigo.trim().toUpperCase() : null;
+      // ── Generar código: NOMBRE-BARRIO todo en MAYÚSCULAS ─────────
+      // Fuente: columnas NOMBRE y BARRIO de la tabla cuadrantes.
+      // El nombre siempre sigue la convención C1, C2, C3…
+      // Ejemplos: nombre="C1" barrio="Belén"   → "C1-BELÉN"
+      //           nombre="C2" barrio="poblado"  → "C2-POBLADO"
+      let codigoFinal;
+      if (codigo && codigo.trim()) {
+        // Si el usuario provee un código explícito, usarlo en mayúsculas
+        codigoFinal = codigo.trim().toUpperCase();
+      } else {
+        const prefijo = (nombre || '').trim().toUpperCase();                 // "C1", "C2"…
+        const sufijo  = (barrio  || '').trim().toUpperCase().replace(/\s+/g, '_'); // "BELÉN", "EL_POBLADO"
+
+        const candidato = sufijo ? `${prefijo}-${sufijo}` : prefijo;
+
+        // Evitar duplicados: si ya existe, agregar sufijo numérico (-2, -3…)
+        let intentos = 0;
+        let codigoPrueba = candidato;
+        while (true) {
+          intentos++;
+          const existe = await client.query('SELECT 1 FROM cuadrantes WHERE codigo = $1', [codigoPrueba]);
+          if (!existe.rows.length) break;
+          codigoPrueba = `${candidato}-${intentos + 1}`;
+          if (intentos > 50) { codigoPrueba = `${prefijo}-${Date.now()}`; break; }
+        }
+        codigoFinal = codigoPrueba;
+      }
 
       // Color: prioridad → color explícito → color del barrio → color automático
       let colorFinal = color;
@@ -176,6 +201,14 @@ class Cuadrante {
                            props.NOMBRE    || props.name      || `${nombreArchivo}-${i+1}`;
           const codigo   = props.Cuadrante || props.codigo    || props.id?.toString();
           const barrio   = nombreArchivo;
+          // Leer comuna desde las properties del GeoJSON si está disponible
+          // Campos comunes: COMMUNE, commune, COMUNA, comuna, NOM_COMUNE, etc.
+          const comunaRaw = props.COMMUNE   || props.commune  ||
+                            props.COMUNA    || props.comuna   ||
+                            props.NOM_COMUNE || props.NOM_COM ||
+                            props.NOMBRE_COMUNA || props.nombre_comuna ||
+                            null;
+          const comunaFinal = comunaRaw ? String(comunaRaw).trim() : null;
           const geometry = feature.geometry;
 
           if (!geometry || !['Polygon','MultiPolygon'].includes(geometry.type)) {
@@ -186,14 +219,14 @@ class Cuadrante {
           const codigoFinal = `${String(codigo).toUpperCase()}-${String(nombreArchivo).replace(/\s+/g,'-').toUpperCase()}`;
 
           const insertSQL = `
-            INSERT INTO cuadrantes (nombre, codigo, barrio, color, geom)
-            VALUES ($1, $2, $3, $4, ST_SetSRID(ST_GeomFromGeoJSON($5), 4326))
+            INSERT INTO cuadrantes (nombre, codigo, barrio, comuna, color, geom)
+            VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_GeomFromGeoJSON($6), 4326))
             ON CONFLICT DO NOTHING
-            RETURNING id, nombre, codigo, barrio, color,
+            RETURNING id, nombre, codigo, barrio, comuna, color,
               ST_AsGeoJSON(geom) AS geom_json
           `;
           const res = await client.query(insertSQL, [
-            nombre, codigoFinal, barrio, colorDelArchivo,
+            nombre, codigoFinal, barrio, comunaFinal, colorDelArchivo,
             JSON.stringify(geometry)
           ]);
 
@@ -201,10 +234,13 @@ class Cuadrante {
             // Conflicto — actualizar preservando el color existente del barrio
             const upd = await client.query(`
               UPDATE cuadrantes SET nombre=$1, color=$2,
-                geom=ST_SetSRID(ST_GeomFromGeoJSON($3),4326), updated_at=NOW()
+                geom=ST_SetSRID(ST_GeomFromGeoJSON($3),4326),
+                ${comunaFinal ? 'comuna=$5,' : ''} updated_at=NOW()
               WHERE codigo=$4
-              RETURNING id, nombre, codigo, barrio, color
-            `, [nombre, colorDelArchivo, JSON.stringify(geometry), codigoFinal]);
+              RETURNING id, nombre, codigo, barrio, comuna, color
+            `, comunaFinal
+              ? [nombre, colorDelArchivo, JSON.stringify(geometry), codigoFinal, comunaFinal]
+              : [nombre, colorDelArchivo, JSON.stringify(geometry), codigoFinal]);
             if (upd.rows[0]) exitosos.push(upd.rows[0]);
             continue;
           }
@@ -228,16 +264,20 @@ class Cuadrante {
 
   // ── Obtener barrios disponibles con su color representativo ─
   static async obtenerBarrios() {
-    const sql = `
-      SELECT barrio, MIN(color) AS color, COUNT(*) AS total_cuadrantes
-      FROM cuadrantes
-      WHERE barrio IS NOT NULL AND barrio != ''
-      GROUP BY barrio
-      ORDER BY barrio
-    `;
-    const result = await query(sql);
-    return result.rows;
-  }
+  const sql = `
+    SELECT 
+      barrio,
+      MIN(color) AS color,
+      MAX(comuna) AS comuna, -- 👈 ESTE ES EL CAMBIO CLAVE
+      COUNT(*) AS total_cuadrantes
+    FROM cuadrantes
+    WHERE barrio IS NOT NULL AND barrio != ''
+    GROUP BY barrio
+    ORDER BY barrio
+  `;
+  const result = await query(sql);
+  return result.rows;
+}
 
   // ── Cambiar barrio de un cuadrante (actualiza color también) ─
   static async actualizarBarrio(id, barrio) {
@@ -380,6 +420,51 @@ class Cuadrante {
       );
       return result.rows[0] || null;
     });
+  }
+
+  // ── Asignar comuna a TODOS los cuadrantes de un barrio ───────
+  static async actualizarComunaPorBarrio(barrio, comuna) {
+    const result = await query(
+      `UPDATE cuadrantes
+       SET comuna = $1, updated_at = NOW()
+       WHERE LOWER(TRIM(barrio)) = LOWER(TRIM($2))
+       RETURNING id`,
+      [comuna || null, barrio]
+    );
+    return result.rowCount; // cantidad de cuadrantes actualizados
+  }
+
+  // ── Backfill: generar códigos para cuadrantes que tienen codigo NULL ─
+  // Llamado desde el endpoint POST /api/cuadrantes/backfill-codigos
+  static async backfillCodigos() {
+    const { rows } = await query(`
+      SELECT id, nombre, barrio
+      FROM cuadrantes
+      WHERE codigo IS NULL OR TRIM(codigo) = ''
+      ORDER BY id
+    `);
+
+    let actualizados = 0;
+    for (const c of rows) {
+      const prefijo = (c.nombre || '').trim().toUpperCase();
+      const sufijo  = (c.barrio  || '').trim().toUpperCase().replace(/\s+/g, '_');
+      const candidato = sufijo ? `${prefijo}-${sufijo}` : prefijo;
+
+      // Evitar duplicados
+      let intentos = 0;
+      let codigoPrueba = candidato;
+      while (true) {
+        intentos++;
+        const existe = await query('SELECT 1 FROM cuadrantes WHERE codigo=$1 AND id!=$2', [codigoPrueba, c.id]);
+        if (!existe.rows.length) break;
+        codigoPrueba = `${candidato}-${intentos + 1}`;
+        if (intentos > 50) { codigoPrueba = `${prefijo}-${c.id}`; break; }
+      }
+
+      await query('UPDATE cuadrantes SET codigo=$1, updated_at=NOW() WHERE id=$2', [codigoPrueba, c.id]);
+      actualizados++;
+    }
+    return actualizados;
   }
 }
 

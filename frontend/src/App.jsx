@@ -1,5 +1,6 @@
 // ============================================================
 // frontend/src/App.jsx
+// Fix: todos los hooks ANTES de cualquier return condicional
 // ============================================================
 
 import { useState, useCallback, useEffect } from 'react';
@@ -9,22 +10,21 @@ import PersonaForm from './forms/PersonaForm';
 import ExcelPanel from './components/ExcelPanel';
 import StatsPanel from './components/StatsPanel';
 import CuadrantesPanel from './components/CuadrantesPanel';
+import LoginModal, { getSession, clearSession } from './components/LoginModal';
 import { Toaster } from 'react-hot-toast';
 
 export default function App() {
+  // ── TODOS los hooks primero, sin excepción ────────────────
+  const [sesion,           setSesion]           = useState(() => getSession());
   const [activeTab,        setActiveTab]        = useState('mapa');
   const [selectedPin,      setSelectedPin]      = useState(null);
   const [showForm,         setShowForm]         = useState(false);
   const [formMode,         setFormMode]         = useState('crear');
   const [pendingCoords,    setPendingCoords]    = useState(null);
-  // refreshKey: para tabla, stats, cuadrantesPanel, excel — NO para MapView
   const [refreshKey,       setRefreshKey]       = useState(0);
-  // recargarTrigger: le dice al MapView que recargue pines/cuadrantes
-  // sin desmontarse (sin perder zoom ni posición)
   const [recargarTrigger,  setRecargarTrigger]  = useState(0);
-
-  const [modoMapa,          setModoMapa]          = useState('normal');
-  const [cuadranteEnCurso,  setCuadranteEnCurso]  = useState(null);
+  const [modoMapa,         setModoMapa]         = useState('normal');
+  const [cuadranteEnCurso, setCuadranteEnCurso] = useState(null);
 
   // Escuchar evento global "editar-persona" desde popups del mapa
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function App() {
 
   const handleGuardado  = useCallback(() => {
     setRefreshKey(k => k + 1);
-    setRecargarTrigger(k => k + 1); // recargar pines sin desmontar mapa
+    setRecargarTrigger(k => k + 1);
     setShowForm(false);
     setPendingCoords(null);
     setSelectedPin(null);
@@ -55,7 +55,6 @@ export default function App() {
     setRecargarTrigger(k => k + 1);
   }, []);
 
-  // Al crear cuadrante: solo recargar capas internas del mapa, sin remontarlo
   const handleCuadranteGuardado = useCallback(() => {
     setRefreshKey(k => k + 1);
     setRecargarTrigger(k => k + 1);
@@ -80,6 +79,14 @@ export default function App() {
     }
   };
 
+  const handleLogout = () => {
+    clearSession();
+    setSesion(null);
+  };
+
+  // ── Returns condicionales DESPUÉS de todos los hooks ──────
+  if (!sesion) return <LoginModal onLogin={setSesion} />;
+
   const tabs = [
     { id: 'mapa',         label: '🗺️ Mapa' },
     { id: 'tabla',        label: '📋 Tabla' },
@@ -96,11 +103,7 @@ export default function App() {
 
       <header className="app-header">
         <div className="header-brand">
-            <img 
-              src="/pacto_logo.png" 
-              alt="Logo Pacto" 
-              className="header-logo"
-            />
+          <img src="/pacto_logo.png" alt="Logo" className="header-logo" />
           <div>
             <h1>Sistema de gestión geografica</h1>
             <p>Manejo geográfico y electoral por comunas</p>
@@ -120,15 +123,35 @@ export default function App() {
         </nav>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{
+            fontSize: '12px', color: 'var(--text-secondary)',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: '6px', padding: '4px 10px', whiteSpace: 'nowrap',
+          }}>
+            {sesion.rol === 'admin' ? '👑 Admin' : `📍 ${sesion.comuna}`}
+          </span>
+
+          <button
+            className="btn-secondary"
+            onClick={handleLogout}
+            style={{ fontSize: '12px', padding: '5px 12px' }}
+            title="Cerrar sesión"
+          >
+            Salir
+          </button>
+
           {activeTab === 'mapa' && (
             <button
               className="btn-secondary"
               onClick={toggleCrearCuadrante}
-              style={esModoCrearCuadrante ? { background: '#F59E0B', color: 'white', borderColor: '#F59E0B' } : {}}
+              style={esModoCrearCuadrante
+                ? { background: '#F59E0B', color: 'white', borderColor: '#F59E0B' }
+                : {}}
             >
               {esModoCrearCuadrante ? '❌ Cancelar cuadrante' : '🔲 Crear cuadrante'}
             </button>
           )}
+
           <button className="btn-primary" onClick={agregarPersona}>
             + Agregar persona
           </button>
@@ -137,8 +160,6 @@ export default function App() {
 
       <main className="app-main">
         {activeTab === 'mapa' && (
-          // ⚠️ SIN key={refreshKey} — la instancia Leaflet es permanente
-          // recargarTrigger le dice que recargue datos sin desmontarse
           <MapView
             onMapClick={handleMapClick}
             onPinClick={handlePinClick}
@@ -154,6 +175,7 @@ export default function App() {
         {activeTab === 'tabla' && (
           <PersonaTable
             key={refreshKey}
+            sesion={sesion}
             onEdit={(p) => { setSelectedPin(p); setFormMode('editar'); setShowForm(true); }}
           />
         )}

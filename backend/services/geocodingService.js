@@ -167,15 +167,34 @@ async function geocodificarInverso(latitud, longitud) {
  */
 function normalizarDireccionColombia(dir) {
   if (!dir) return '';
-  return dir
-    .replace(/[#]/g, '')
-    .replace(/\bCra\.?\b/gi, 'Carrera')
-    .replace(/\bCl\.?\b/gi, 'Calle')
-    .replace(/\bAv\.?\b/gi, 'Avenida')
-    .replace(/\bDg\.?\b/gi, 'Diagonal')
-    .replace(/\bTv\.?\b/gi, 'Transversal')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let s = dir.trim();
+
+  // 1. Expandir abreviaturas de vía (orden importa: más largas primero)
+  s = s.replace(/\bCarr?\.\s*/gi,    'Carrera ');
+  s = s.replace(/\bCra?\.\s*/gi,     'Carrera ');
+  s = s.replace(/\bCl\b\.?\s*/gi,    'Calle ');
+  s = s.replace(/\bClle?\b\.?\s*/gi, 'Calle ');
+  s = s.replace(/\bAv\b\.?\s*/gi,    'Avenida ');
+  s = s.replace(/\bDg\b\.?\s*/gi,    'Diagonal ');
+  s = s.replace(/\bTv\b\.?\s*/gi,    'Transversal ');
+  s = s.replace(/\bKm\b\.?\s*/gi,    'Kilómetro ');
+  s = s.replace(/\bCir\b\.?\s*/gi,   'Circular ');
+  s = s.replace(/\bVarnt?\b\.?\s*/gi,'Variante ');
+
+  // 2. Fusionar número separado de su letra sufijo: "97 C" → "97C", "84 A" → "84A"
+  //    Aplica ANTES de eliminar espacios extra para no afectar otros términos
+  s = s.replace(/(\d+)\s+([A-Z])\b(?!\s*arrera|\s*alle|\s*venida|\s*iagonal|\s*ransversal)/gi,
+    (match, num, letra) => `${num}${letra.toUpperCase()}`
+  );
+
+  // 3. Normalizar el símbolo # (dejarlo para Nominatim — ya maneja "#")
+  //    Solo limpiar espacios alrededor: "# 84" → "#84"
+  s = s.replace(/\s*#\s*/g, ' #');
+
+  // 4. Eliminar espacios múltiples
+  s = s.replace(/\s+/g, ' ').trim();
+
+  return s;
 }
 
 /**

@@ -26,7 +26,8 @@ const COMUNAS_MEDELLIN = [
 
 const KML_COLORS = ['#7C3AED','#0891B2','#D97706','#059669','#DC2626','#DB2777','#2563EB','#65A30D'];
 
-const CUAD_FORM_VACIO = { nombre: '', descripcion: '', barrio: '' };
+const CUAD_FORM_VACIO = { nombre: '', descripcion: '', barrio: '', comuna: '' };
+// const CUAD_FORM_VACIO = { nombre: '', descripcion: '', barrio: '' };
 
 const crearIcono = () => L.divIcon({
   className: '',
@@ -172,20 +173,26 @@ export default function MapView({
   onCuadranteGuardado, onCancelarCuadrante,
   recargarTrigger,   // número — cuando cambia, recarga pines+cuadrantes sin desmontar
 }) {
-  const mapRef          = useRef(null);
-  const leafletMap      = useRef(null);
-  const markersLayer    = useRef(null);
-  const cuadrantesLayer = useRef(null);
-  const kmlLayersRef    = useRef({});
-  const cuadPoliLayer   = useRef(null);
-  const cuadPuntosLayer = useRef(null);
-  const filtrosRef      = useRef({ comuna: '' });
-  const kmlFileRef      = useRef(null);
-  const mapInitialized  = useRef(false);
+  const mapRef           = useRef(null);
+  const leafletMap       = useRef(null);
+  const markersLayer     = useRef(null);
+  const cuadrantesLayer  = useRef(null);
+  const kmlLayersRef     = useRef({});
+  const cuadPoliLayer    = useRef(null);
+  const cuadPuntosLayer  = useRef(null);
+  const filtrosRef          = useRef({ comuna: '' });
+  const filtrosCuadRef      = useRef({ comuna: '', barrio: '' }); // filtros visuales de cuadrantes
+  const kmlFileRef          = useRef(null);
+  const mapInitialized      = useRef(false);
+  // Edición de geometría desde el mapa
+  const editGeomPoliLayer  = useRef(null);
+  const editGeomPtosLayer  = useRef(null);
+  // Cache de todos los cuadrantes para filtrado local
+  const todosCuadrantesRef = useRef(null);
 
-  const [filtros,      setFiltros]      = useState({ comuna: '' });
-  const [loading,      setLoading]      = useState(false);
-  // kmlCapas: estado de capas KML con visibilidad persistida en localStorage
+  const [filtros,          setFiltros]          = useState({ comuna: '' });
+  const [filtrosCuad,      setFiltrosCuad]      = useState({ comuna: '', barrio: '' });
+  const [loading,          setLoading]          = useState(false);
   const [kmlCapas,     setKmlCapas]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('kmlCapas')) || []; } catch { return []; }
   });
@@ -193,22 +200,30 @@ export default function MapView({
   const [cuadForm,     setCuadForm]     = useState(CUAD_FORM_VACIO);
   const [cuadErrores,  setCuadErrores]  = useState({});
   const [cuadGuardando,setCuadGuardando]= useState(false);
-  // Barrios disponibles para el selector del formulario de cuadrante
   const [barriosDisponibles, setBarriosDisponibles] = useState([]);
+  // Estado para edición de geometría inline en el mapa
+  const [editGeom, setEditGeom] = useState(null); // { id, nombre, puntos[] }
 
   const esModoCrearCuadrante = modoMapa === 'crear-cuadrante';
+  const esModoEditGeom       = !!editGeom;
 
-  // ── Cargar cuadrantes ───────────────────────────────────────
-  // Cada cuadrante usa su propio color guardado en BD.
-  // Soporta Polygon y MultiPolygon (datos de QGIS).
-  const cargarCuadrantes = useCallback(async () => {
+  // ── Renderizar cuadrantes en mapa (aplica filtros locales) ────
+  const renderizarCuadrantes = useCallback((geojson, fCuad) => {
     if (!cuadrantesLayer.current) return;
-    try {
-      const { data } = await api.get('/cuadrantes');
-      cuadrantesLayer.current.clearLayers();
-      if (!data.features?.length) return;
+    cuadrantesLayer.current.clearLayers();
+    if (!geojson?.features?.length) return;
 
-      L.geoJSON(data, {
+    // Filtrar features localmente — sin nueva petición al backend
+    const features = geojson.features.filter(f => {
+      const p = f.properties;
+      if (fCuad.comuna && (p.comuna || '').toLowerCase() !== fCuad.comuna.toLowerCase()) return false;
+      if (fCuad.barrio && (p.barrio  || '').toLowerCase() !== fCuad.barrio.toLowerCase())  return false;
+      return true;
+    });
+
+    if (!features.length) return;
+
+    L.geoJSON({ type: 'FeatureCollection', features }, {
         // Estilo base usando el color propio de cada cuadrante
         style: (feature) => {
           const color = feature.properties?.color || '#2563EB';
@@ -242,20 +257,45 @@ export default function MapView({
             color, weight: 2, fillColor: color, fillOpacity: 0.25, opacity: 0.85,
           }));
 
-          // Click — seleccionar y mostrar resumen
+          // Click — popup con opción de editar geometría
           layer.on('click', (e) => {
             L.DomEvent.stopPropagation(e);
-            // Resaltar el cuadrante clickeado brevemente
             layer.setStyle({ weight: 4, fillOpacity: 0.55 });
             setTimeout(() => layer.setStyle({
               color, weight: 2, fillColor: color, fillOpacity: 0.25, opacity: 0.85,
             }), 1200);
-            toast(`📍 ${p.nombre}${p.barrio ? ` — ${p.barrio}` : ''}: ${p.total_personas} personas`);
+
+            // Popup con botón "Editar geometría"
+            const div = document.createElement('div');
+            div.style.cssText = 'font-family:system-ui,sans-serif;min-width:170px';
+            div.innerHTML = `
+              <p style="font-weight:700;font-size:13px;margin:0 0 4px">${p.nombre}</p>
+              ${p.barrio ? `<p style="font-size:11px;color:#666;margin:0 0 4px">${p.barrio}</p>` : ''}
+              <p style="font-size:12px;margin:0 0 8px">👥 ${p.total_personas} personas</p>
+            `;
+            const btn = document.createElement('button');
+            btn.textContent = '✏️ Editar geometría';
+            btn.style.cssText = 'display:block;width:100%;padding:5px 0;background:#DC2626;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
+            btn.addEventListener('click', () => {
+              layer.closePopup();
+              window.dispatchEvent(new CustomEvent('editar-geom-cuadrante', { detail: { feature } }));
+            });
+            div.appendChild(btn);
+            layer.bindPopup(div).openPopup(e.latlng);
           });
         },
       }).addTo(cuadrantesLayer.current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Cargar cuadrantes desde API, cachear y renderizar ───────
+  const cargarCuadrantes = useCallback(async () => {
+    if (!cuadrantesLayer.current) return;
+    try {
+      const { data } = await api.get('/cuadrantes'); // siempre trae TODOS
+      todosCuadrantesRef.current = data;              // guardar cache completo
+      renderizarCuadrantes(data, filtrosCuadRef.current);
     } catch (err) { console.error('Error cuadrantes:', err); }
-  }, []);
+  }, [renderizarCuadrantes]);
 
   // ── Cargar pines ────────────────────────────────────────────
   const cargarPines = useCallback(async (f) => {
@@ -340,11 +380,13 @@ export default function MapView({
       attribution: '© CartoDB © OpenStreetMap', maxZoom: 19,
     }).addTo(map);
 
-    cuadrantesLayer.current = L.layerGroup().addTo(map);
-    markersLayer.current    = L.layerGroup().addTo(map);
-    cuadPoliLayer.current   = L.layerGroup().addTo(map);
-    cuadPuntosLayer.current = L.layerGroup().addTo(map);
-    leafletMap.current      = map;
+    cuadrantesLayer.current    = L.layerGroup().addTo(map);
+    markersLayer.current       = L.layerGroup().addTo(map);
+    cuadPoliLayer.current      = L.layerGroup().addTo(map);
+    cuadPuntosLayer.current    = L.layerGroup().addTo(map);
+    editGeomPoliLayer.current  = L.layerGroup().addTo(map);
+    editGeomPtosLayer.current  = L.layerGroup().addTo(map);
+    leafletMap.current         = map;
 
     // Click en el mapa — delegar siempre al handler actual vía ref
     map.on('click', (e) => {
@@ -424,6 +466,21 @@ export default function MapView({
     }
   }, [esModoCrearCuadrante]);
 
+  useEffect(() => {
+  if (!cuadForm.barrio) return;
+
+  const encontrado = barriosDisponibles.find(
+    b => b.barrio === cuadForm.barrio
+  );
+
+  if (encontrado && encontrado.comuna) {
+    setCuadForm(prev => ({
+      ...prev,
+      comuna: encontrado.comuna
+    }));
+  } 
+}, [cuadForm.barrio, barriosDisponibles]);
+
   const guardarCuadrante = async () => {
     const errs = {};
     if (!cuadForm.nombre.trim()) errs.nombre = 'Requerido';
@@ -439,6 +496,9 @@ export default function MapView({
         nombre:      cuadForm.nombre.trim(),
         descripcion: cuadForm.descripcion.trim() || null,
         barrio:      cuadForm.barrio.trim()       || null,  // ← hereda color del barrio
+
+        comuna:      cuadForm.comuna || null, // 👈 ESTE ES EL CAMBIO CLAVE
+
         geometry:    { type: 'Polygon', coordinates: [coords] },
       });
       const asignadas = resp.data.personas_asignadas || 0;
@@ -470,6 +530,106 @@ export default function MapView({
     cuadPuntosLayer.current?.clearLayers();
   };
 
+  // ── Edición de geometría de cuadrante desde el mapa ──────────
+  const iniciarEditGeomMapa = (feature) => {
+    const coords = feature.geometry?.coordinates?.[0] || [];
+    const puntos = coords.slice(0, -1).map(([lng, lat]) => [lat, lng]);
+    setEditGeom({ id: feature.properties.id, nombre: feature.properties.nombre, puntos });
+  };
+
+  const dibujarEditGeom = (puntos) => {
+    if (!editGeomPoliLayer.current || !editGeomPtosLayer.current) return;
+    editGeomPoliLayer.current.clearLayers();
+    editGeomPtosLayer.current.clearLayers();
+    if (!puntos.length) return;
+    puntos.forEach((pt, i) => {
+      const marker = L.marker(pt, {
+        draggable: true,
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="background:#DC2626;color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:move">${i+1}</div>`,
+          iconSize: [24,24], iconAnchor: [12,12],
+        }),
+      }).addTo(editGeomPtosLayer.current);
+      marker.on('drag', (ev) => {
+        const { lat, lng } = ev.target.getLatLng();
+        const copia = [...puntos]; copia[i] = [lat, lng];
+        editGeomPoliLayer.current.clearLayers();
+        if (copia.length >= 3)
+          L.polygon(copia, { color:'#DC2626', weight:2.5, fillColor:'#EF4444', fillOpacity:0.18 }).addTo(editGeomPoliLayer.current);
+      });
+      marker.on('dragend', (ev) => {
+        const { lat, lng } = ev.target.getLatLng();
+        setEditGeom(prev => {
+          const nuevos = [...prev.puntos]; nuevos[i] = [lat, lng];
+          dibujarEditGeom(nuevos);
+          return { ...prev, puntos: nuevos };
+        });
+      });
+    });
+    if (puntos.length >= 3)
+      L.polygon(puntos, { color:'#DC2626', weight:2.5, fillColor:'#EF4444', fillOpacity:0.18 }).addTo(editGeomPoliLayer.current);
+    else if (puntos.length === 2)
+      L.polyline(puntos, { color:'#DC2626', weight:2 }).addTo(editGeomPoliLayer.current);
+  };
+
+  // Dibujar/actualizar cuando cambian los puntos de edición
+  useEffect(() => {
+    if (!editGeom) {
+      editGeomPoliLayer.current?.clearLayers();
+      editGeomPtosLayer.current?.clearLayers();
+      return;
+    }
+    // Redibujar con los puntos actuales
+    if (editGeomPoliLayer.current && editGeomPtosLayer.current) {
+      dibujarEditGeom(editGeom.puntos);
+    }
+    // Handler de click para agregar puntos en modo edición geom
+    const map = leafletMap.current;
+    if (!map) return;
+    const clickHandler = (e) => {
+      if (e.originalEvent.target.closest('.leaflet-popup-content-wrapper')) return;
+      if (e.originalEvent.target.closest('.leaflet-control')) return;
+      setEditGeom(prev => {
+        if (!prev) return prev;
+        const nuevos = [...prev.puntos, [e.latlng.lat, e.latlng.lng]];
+        dibujarEditGeom(nuevos);
+        return { ...prev, puntos: nuevos };
+      });
+    };
+    map.on('click', clickHandler);
+    return () => map.off('click', clickHandler);
+  }, [editGeom?.id, editGeom?.puntos?.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cancelarEditGeom = () => {
+    setEditGeom(null);
+    editGeomPoliLayer.current?.clearLayers();
+    editGeomPtosLayer.current?.clearLayers();
+  };
+
+  const guardarEditGeom = async () => {
+    if (!editGeom || editGeom.puntos.length < 3) { toast.error('Mínimo 3 puntos'); return; }
+    try {
+      const coords = [...editGeom.puntos, editGeom.puntos[0]].map(([lat, lng]) => [lng, lat]);
+      await api.put(`/cuadrantes/${editGeom.id}/geometria`, { geometry: { type:'Polygon', coordinates:[coords] } });
+      toast.success(`✅ Geometría de "${editGeom.nombre}" actualizada`);
+      cancelarEditGeom();
+      cargarCuadrantes();
+    } catch { toast.error('Error guardando geometría'); }
+  };
+
+  // Escuchar evento global del popup de cuadrante → iniciar edición de geometría
+  useEffect(() => {
+    const handler = (e) => {
+      const { feature } = e.detail;
+      const coords = feature.geometry?.coordinates?.[0] || [];
+      const puntos = coords.slice(0, -1).map(([lng, lat]) => [lat, lng]);
+      setEditGeom({ id: feature.properties.id, nombre: feature.properties.nombre, puntos });
+    };
+    window.addEventListener('editar-geom-cuadrante', handler);
+    return () => window.removeEventListener('editar-geom-cuadrante', handler);
+  }, []);
+
   // ── Persistir visibilidad KML en localStorage ───────────────
   useEffect(() => {
     try {
@@ -481,20 +641,25 @@ export default function MapView({
   }, [kmlCapas]);
 
   // ── Recargar datos cuando recargarTrigger cambia ────────────
-  // Permite que App.jsx dispare recarga sin desmontar el mapa
-  // (mantiene zoom, posición y estado KML)
   useEffect(() => {
     if (!recargarTrigger || !leafletMap.current) return;
     cargarCuadrantes();
     cargarPines(filtrosRef.current);
   }, [recargarTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Filtros ─────────────────────────────────────────────────
+  // ── Filtros de personas ─────────────────────────────────────
   useEffect(() => {
     filtrosRef.current = filtros;
     if (!leafletMap.current) return;
     cargarPines(filtros);
   }, [filtros]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Filtros de cuadrantes (local, sin nueva petición) ───────
+  useEffect(() => {
+    filtrosCuadRef.current = filtrosCuad;
+    if (!leafletMap.current || !todosCuadrantesRef.current) return;
+    renderizarCuadrantes(todosCuadrantesRef.current, filtrosCuad);
+  }, [filtrosCuad, renderizarCuadrantes]);
 
   useEffect(() => {
     if (selectedPin?.latitud && leafletMap.current) {
@@ -564,7 +729,16 @@ export default function MapView({
   };
 
   const nPuntos = cuadranteEnCurso?.poligono?.length || 0;
-  const cursor  = esModoCrearCuadrante ? 'crosshair' : '';
+  const cursor  = esModoCrearCuadrante || esModoEditGeom ? 'crosshair' : '';
+
+  // Barrios únicos de los cuadrantes cargados (para el selector)
+  const barriosEnMapa = todosCuadrantesRef.current
+    ? [...new Set(
+        todosCuadrantesRef.current.features
+          .map(f => f.properties.barrio)
+          .filter(Boolean)
+      )].sort()
+    : [];
 
   // ── Render ──────────────────────────────────────────────────
   return (
@@ -572,17 +746,123 @@ export default function MapView({
 
       {/* Toolbar */}
       <div className="map-toolbar">
-        <select value={filtros.comuna} onChange={e=>setFiltros(f=>({...f,comuna:e.target.value}))} className="filter-select">
-          <option value="">Todas las comunas</option>
+        {/* Filtro personas por comuna */}
+        <select
+          value={filtros.comuna}
+          onChange={e=>setFiltros(f=>({...f,comuna:e.target.value}))}
+          className="filter-select"
+          title="Filtrar personas por comuna"
+        >
+          <option value="">👥 Todas las comunas</option>
           {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
         </select>
-        <button className="btn-secondary" onClick={cargarCuadrantes} title="Recargar cuadrantes">🔄 Cuadrantes</button>
+
+        {/* Divisor */}
+        <span style={{color:'var(--border)',fontSize:'18px',lineHeight:1}}>│</span>
+
+        {/* Filtro cuadrantes por comuna */}
+        <select
+          value={filtrosCuad.comuna}
+          onChange={e => setFiltrosCuad(f => ({ ...f, comuna: e.target.value, barrio: '' }))}
+          className="filter-select"
+          title="Filtrar cuadrantes por comuna"
+          style={{borderColor: filtrosCuad.comuna ? '#2563EB' : undefined}}
+        >
+          <option value="">🔲 Todas comunas</option>
+          {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+
+        {/* Filtro cuadrantes por barrio */}
+        <select
+          value={filtrosCuad.barrio}
+          onChange={e => setFiltrosCuad(f => ({ ...f, barrio: e.target.value }))}
+          className="filter-select"
+          title="Filtrar cuadrantes por barrio"
+          style={{borderColor: filtrosCuad.barrio ? '#2563EB' : undefined}}
+        >
+          <option value="">🏘️ Todos los barrios</option>
+          {barriosEnMapa.map(b=><option key={b} value={b}>{b}</option>)}
+        </select>
+
+        {/* Limpiar filtros de cuadrantes */}
+        {(filtrosCuad.comuna || filtrosCuad.barrio) && (
+          <button
+            className="btn-secondary"
+            onClick={() => setFiltrosCuad({ comuna: '', barrio: '' })}
+            title="Quitar filtros de cuadrantes"
+            style={{padding:'4px 8px',fontSize:'12px'}}
+          >✕ Cuadrantes</button>
+        )}
+
+        <button className="btn-secondary" onClick={cargarCuadrantes} title="Recargar cuadrantes">🔄</button>
         <label className={`btn-secondary ${kmlLoading?'disabled':''}`} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:'4px'}}>
           {kmlLoading?'⏳':'📂'} KML
           <input ref={kmlFileRef} type="file" accept=".kml" onChange={handleKmlImport} disabled={kmlLoading} style={{display:'none'}}/>
         </label>
         {loading && <span className="loading-badge">Cargando...</span>}
       </div>
+
+      {/* Panel edición de geometría desde el mapa */}
+      {esModoEditGeom && (
+        <div style={{
+          position:'absolute', top:'60px', right:'12px', zIndex:1100,
+          background:'white', borderRadius:'10px', padding:'14px 16px',
+          boxShadow:'0 4px 20px rgba(0,0,0,0.2)', width:'270px',
+          fontFamily:'system-ui,sans-serif',
+        }}>
+          <p style={{margin:'0 0 8px',fontSize:'13px',fontWeight:700,color:'#DC2626'}}>
+            🗺️ Editando geometría
+          </p>
+          <p style={{margin:'0 0 10px',fontSize:'12px',color:'#374151',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            {editGeom.nombre}
+          </p>
+          <div style={{background:'#FEF2F2',borderRadius:'6px',padding:'7px 10px',marginBottom:'10px',fontSize:'12px',color:'#7F1D1D'}}>
+            <strong>Arrastra</strong> los puntos rojos para moverlos.<br/>
+            <strong>Click en el mapa</strong> para agregar vértices.
+          </div>
+          <div style={{
+            display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px',
+            background: editGeom.puntos.length>=3?'#DCFCE7':'#FEF9C3',
+            padding:'5px 10px',borderRadius:'6px',fontSize:'12px',
+            color: editGeom.puntos.length>=3?'#166534':'#92400E',fontWeight:500,
+          }}>
+            {editGeom.puntos.length} punto{editGeom.puntos.length!==1?'s':''} {editGeom.puntos.length>=3?'✅':'(mín. 3)'}
+          </div>
+          <div style={{display:'flex',gap:'6px',marginBottom:'8px'}}>
+            <button
+              onClick={() => setEditGeom(prev => {
+                const nuevos = prev.puntos.slice(0,-1);
+                setTimeout(() => dibujarEditGeom(nuevos), 0);
+                return { ...prev, puntos: nuevos };
+              })}
+              disabled={editGeom.puntos.length===0}
+              className="btn-secondary"
+              style={{flex:1,padding:'5px',fontSize:'12px'}}
+            >↩ Deshacer</button>
+            <button
+              onClick={() => setEditGeom(prev => {
+                setTimeout(() => { editGeomPoliLayer.current?.clearLayers(); editGeomPtosLayer.current?.clearLayers(); }, 0);
+                return { ...prev, puntos: [] };
+              })}
+              disabled={editGeom.puntos.length===0}
+              className="btn-secondary"
+              style={{flex:1,padding:'5px',fontSize:'12px'}}
+            >🗑 Limpiar</button>
+          </div>
+          <div style={{display:'flex',gap:'6px'}}>
+            <button onClick={cancelarEditGeom} className="btn-secondary" style={{flex:1,padding:'7px',fontSize:'12px'}}>
+              Cancelar
+            </button>
+            <button
+              onClick={guardarEditGeom}
+              disabled={editGeom.puntos.length<3}
+              style={{flex:1,padding:'7px',fontSize:'12px',background:'#DC2626',color:'white',border:'none',borderRadius:'6px',cursor:editGeom.puntos.length<3?'not-allowed':'pointer',fontWeight:600,opacity:editGeom.puntos.length<3?0.6:1}}
+            >
+              ✅ Guardar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Panel creación de cuadrante */}
       {esModoCrearCuadrante && (
@@ -664,6 +944,37 @@ export default function MapView({
               </div>
             );
           })()}
+
+          {/* 👇 AQUÍ VA COMUNA */}
+          <div style={{marginBottom:'8px'}}>
+            <label style={{
+              fontSize:'11px',
+              fontWeight:600,
+              color:'#374151',
+              display:'block',
+              marginBottom:'3px'
+            }}>
+              Comuna
+            </label>
+
+            <select
+              value={cuadForm.comuna}
+              onChange={e=>setCuadForm(f=>({...f, comuna:e.target.value}))}
+              style={{
+                width:'100%',
+                padding:'5px 8px',
+                borderRadius:'6px',
+                border:'1.5px solid #D1D5DB',
+                fontSize:'12px',
+                boxSizing:'border-box'
+              }}
+            >
+              <option value="">— Seleccionar comuna —</option>
+              {COMUNAS_MEDELLIN.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
 
           {/* Campo descripción */}
           <div style={{marginBottom:'12px'}}>
