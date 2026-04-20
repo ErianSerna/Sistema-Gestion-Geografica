@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 // Contraseña fija de autorización para eliminar
-const DELETE_PASSWORD = 'admin';
+const DELETE_PASSWORD = 'admin_delete';
 
 /**
  * Modal que solicita contraseña antes de permitir eliminar.
