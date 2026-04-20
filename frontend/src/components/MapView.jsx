@@ -26,7 +26,8 @@ const COMUNAS_MEDELLIN = [
 
 const KML_COLORS = ['#7C3AED','#0891B2','#D97706','#059669','#DC2626','#DB2777','#2563EB','#65A30D'];
 
-const CUAD_FORM_VACIO = { nombre: '', descripcion: '', barrio: '' };
+const CUAD_FORM_VACIO = { nombre: '', descripcion: '', barrio: '', comuna: '' };
+// const CUAD_FORM_VACIO = { nombre: '', descripcion: '', barrio: '' };
 
 const crearIcono = () => L.divIcon({
   className: '',
@@ -465,6 +466,21 @@ export default function MapView({
     }
   }, [esModoCrearCuadrante]);
 
+  useEffect(() => {
+  if (!cuadForm.barrio) return;
+
+  const encontrado = barriosDisponibles.find(
+    b => b.barrio === cuadForm.barrio
+  );
+
+  if (encontrado && encontrado.comuna) {
+    setCuadForm(prev => ({
+      ...prev,
+      comuna: encontrado.comuna
+    }));
+  } 
+}, [cuadForm.barrio, barriosDisponibles]);
+
   const guardarCuadrante = async () => {
     const errs = {};
     if (!cuadForm.nombre.trim()) errs.nombre = 'Requerido';
@@ -480,6 +496,9 @@ export default function MapView({
         nombre:      cuadForm.nombre.trim(),
         descripcion: cuadForm.descripcion.trim() || null,
         barrio:      cuadForm.barrio.trim()       || null,  // ← hereda color del barrio
+
+        comuna:      cuadForm.comuna || null, // 👈 ESTE ES EL CAMBIO CLAVE
+
         geometry:    { type: 'Polygon', coordinates: [coords] },
       });
       const asignadas = resp.data.personas_asignadas || 0;
@@ -925,6 +944,37 @@ export default function MapView({
               </div>
             );
           })()}
+
+          {/* 👇 AQUÍ VA COMUNA */}
+          <div style={{marginBottom:'8px'}}>
+            <label style={{
+              fontSize:'11px',
+              fontWeight:600,
+              color:'#374151',
+              display:'block',
+              marginBottom:'3px'
+            }}>
+              Comuna
+            </label>
+
+            <select
+              value={cuadForm.comuna}
+              onChange={e=>setCuadForm(f=>({...f, comuna:e.target.value}))}
+              style={{
+                width:'100%',
+                padding:'5px 8px',
+                borderRadius:'6px',
+                border:'1.5px solid #D1D5DB',
+                fontSize:'12px',
+                boxSizing:'border-box'
+              }}
+            >
+              <option value="">— Seleccionar comuna —</option>
+              {COMUNAS_MEDELLIN.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
 
           {/* Campo descripción */}
           <div style={{marginBottom:'12px'}}>
