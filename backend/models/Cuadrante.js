@@ -108,36 +108,22 @@ class Cuadrante {
   // ── Crear cuadrante individual ──────────────────────────────
   static async crear({ nombre, codigo, comuna, barrio, descripcion, color, geojson_geom }) {
     return withTransaction(async (client) => {
-      // ── Generar código: {NOMBRE_LIMPIO}-{Barrio} ──────────────────
-      // Formato pedido: C1-Castilla, C3-Aranjuez, C2-Belén
-      // Reglas:
-      //   1. Si el usuario pasa un código explícito → usarlo tal cual
-      //   2. Si el nombre sigue patrón C\d+ (ej: "C1", "C2") → usarlo como prefijo
-      //   3. Si no → usar prefijo consecutivo C{n}
-      //   El sufijo siempre es el barrio con capitalización original (tildes incluidas)
+      // ── Generar código: NOMBRE-BARRIO todo en MAYÚSCULAS ─────────
+      // Fuente: columnas NOMBRE y BARRIO de la tabla cuadrantes.
+      // El nombre siempre sigue la convención C1, C2, C3…
+      // Ejemplos: nombre="C1" barrio="Belén"   → "C1-BELÉN"
+      //           nombre="C2" barrio="poblado"  → "C2-POBLADO"
       let codigoFinal;
       if (codigo && codigo.trim()) {
-        codigoFinal = codigo.trim();
+        // Si el usuario provee un código explícito, usarlo en mayúsculas
+        codigoFinal = codigo.trim().toUpperCase();
       } else {
-        // Obtener el próximo número consecutivo
-        const countRes2 = await client.query('SELECT COUNT(*) AS n FROM cuadrantes');
-        const n = parseInt(countRes2.rows[0].n) + 1;
-
-        // Prefijo: si el nombre ya es tipo "C1", "C2"... usarlo; si no, generar "C{n}"
-        const nombreLimpio = (nombre || '').trim();
-        const prefijo = /^C\d+$/i.test(nombreLimpio)
-          ? nombreLimpio.toUpperCase()
-          : `C${n}`;
-
-        // Sufijo: barrio con capitalización original, espacios → guion bajo
-        // Preservar tildes y ñ (no normalizar a ASCII)
-        const sufijo = (barrio && barrio.trim())
-          ? barrio.trim().replace(/\s+/g, '_')
-          : null;
+        const prefijo = (nombre || '').trim().toUpperCase();                 // "C1", "C2"…
+        const sufijo  = (barrio  || '').trim().toUpperCase().replace(/\s+/g, '_'); // "BELÉN", "EL_POBLADO"
 
         const candidato = sufijo ? `${prefijo}-${sufijo}` : prefijo;
 
-        // Evitar duplicados: si ya existe, agregar sufijo numérico
+        // Evitar duplicados: si ya existe, agregar sufijo numérico (-2, -3…)
         let intentos = 0;
         let codigoPrueba = candidato;
         while (true) {
@@ -145,7 +131,7 @@ class Cuadrante {
           const existe = await client.query('SELECT 1 FROM cuadrantes WHERE codigo = $1', [codigoPrueba]);
           if (!existe.rows.length) break;
           codigoPrueba = `${candidato}-${intentos + 1}`;
-          if (intentos > 50) { codigoPrueba = `C${Date.now()}`; break; }
+          if (intentos > 50) { codigoPrueba = `${prefijo}-${Date.now()}`; break; }
         }
         codigoFinal = codigoPrueba;
       }
@@ -447,7 +433,6 @@ class Cuadrante {
   // ── Backfill: generar códigos para cuadrantes que tienen codigo NULL ─
   // Llamado desde el endpoint POST /api/cuadrantes/backfill-codigos
   static async backfillCodigos() {
-    // Traer los que no tienen código, ordenados por id para consecutivos estables
     const { rows } = await query(`
       SELECT id, nombre, barrio
       FROM cuadrantes
@@ -457,11 +442,9 @@ class Cuadrante {
 
     let actualizados = 0;
     for (const c of rows) {
-      const prefijo = /^C\d+$/i.test((c.nombre || '').trim())
-        ? c.nombre.trim().toUpperCase()
-        : `C${c.id}`;
-      const sufijo = c.barrio ? c.barrio.trim().replace(/\s+/g, '_') : null;
-      let candidato = sufijo ? `${prefijo}-${sufijo}` : prefijo;
+      const prefijo = (c.nombre || '').trim().toUpperCase();
+      const sufijo  = (c.barrio  || '').trim().toUpperCase().replace(/\s+/g, '_');
+      const candidato = sufijo ? `${prefijo}-${sufijo}` : prefijo;
 
       // Evitar duplicados
       let intentos = 0;
@@ -471,7 +454,7 @@ class Cuadrante {
         const existe = await query('SELECT 1 FROM cuadrantes WHERE codigo=$1 AND id!=$2', [codigoPrueba, c.id]);
         if (!existe.rows.length) break;
         codigoPrueba = `${candidato}-${intentos + 1}`;
-        if (intentos > 50) { codigoPrueba = `C${c.id}-${Date.now()}`; break; }
+        if (intentos > 50) { codigoPrueba = `${prefijo}-${c.id}`; break; }
       }
 
       await query('UPDATE cuadrantes SET codigo=$1, updated_at=NOW() WHERE id=$2', [codigoPrueba, c.id]);
