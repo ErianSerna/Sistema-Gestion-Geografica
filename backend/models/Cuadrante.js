@@ -263,18 +263,6 @@ class Cuadrante {
   }
 
   // ── Obtener barrios disponibles con su color representativo ─
-  // static async obtenerBarrios() {
-  //   const sql = `
-  //     SELECT barrio, MIN(color) AS color, COUNT(*) AS total_cuadrantes
-  //     FROM cuadrantes
-  //     WHERE barrio IS NOT NULL AND barrio != ''
-  //     GROUP BY barrio
-  //     ORDER BY barrio
-  //   `;
-  //   const result = await query(sql);
-  //   return result.rows;
-  // }
-
   static async obtenerBarrios() {
   const sql = `
     SELECT 
