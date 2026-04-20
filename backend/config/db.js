@@ -22,8 +22,6 @@ const pool = new Pool(
       }
 );
 
-console.log("DATABASE_URL:", process.env.DATABASE_URL ? "OK" : "NO EXISTE");
-
 // Verificar conexión al iniciar
 pool.connect((err, client, release) => {
   if (err) {

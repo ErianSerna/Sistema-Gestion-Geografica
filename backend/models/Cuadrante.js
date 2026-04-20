@@ -200,6 +200,14 @@ class Cuadrante {
                            props.NOMBRE    || props.name      || `${nombreArchivo}-${i+1}`;
           const codigo   = props.Cuadrante || props.codigo    || props.id?.toString();
           const barrio   = nombreArchivo;
+          // Leer comuna desde las properties del GeoJSON si está disponible
+          // Campos comunes: COMMUNE, commune, COMUNA, comuna, NOM_COMUNE, etc.
+          const comunaRaw = props.COMMUNE   || props.commune  ||
+                            props.COMUNA    || props.comuna   ||
+                            props.NOM_COMUNE || props.NOM_COM ||
+                            props.NOMBRE_COMUNA || props.nombre_comuna ||
+                            null;
+          const comunaFinal = comunaRaw ? String(comunaRaw).trim() : null;
           const geometry = feature.geometry;
 
           if (!geometry || !['Polygon','MultiPolygon'].includes(geometry.type)) {
@@ -210,14 +218,14 @@ class Cuadrante {
           const codigoFinal = `${String(codigo).toUpperCase()}-${String(nombreArchivo).replace(/\s+/g,'-').toUpperCase()}`;
 
           const insertSQL = `
-            INSERT INTO cuadrantes (nombre, codigo, barrio, color, geom)
-            VALUES ($1, $2, $3, $4, ST_SetSRID(ST_GeomFromGeoJSON($5), 4326))
+            INSERT INTO cuadrantes (nombre, codigo, barrio, comuna, color, geom)
+            VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_GeomFromGeoJSON($6), 4326))
             ON CONFLICT DO NOTHING
-            RETURNING id, nombre, codigo, barrio, color,
+            RETURNING id, nombre, codigo, barrio, comuna, color,
               ST_AsGeoJSON(geom) AS geom_json
           `;
           const res = await client.query(insertSQL, [
-            nombre, codigoFinal, barrio, colorDelArchivo,
+            nombre, codigoFinal, barrio, comunaFinal, colorDelArchivo,
             JSON.stringify(geometry)
           ]);
 
@@ -225,10 +233,13 @@ class Cuadrante {
             // Conflicto — actualizar preservando el color existente del barrio
             const upd = await client.query(`
               UPDATE cuadrantes SET nombre=$1, color=$2,
-                geom=ST_SetSRID(ST_GeomFromGeoJSON($3),4326), updated_at=NOW()
+                geom=ST_SetSRID(ST_GeomFromGeoJSON($3),4326),
+                ${comunaFinal ? 'comuna=$5,' : ''} updated_at=NOW()
               WHERE codigo=$4
-              RETURNING id, nombre, codigo, barrio, color
-            `, [nombre, colorDelArchivo, JSON.stringify(geometry), codigoFinal]);
+              RETURNING id, nombre, codigo, barrio, comuna, color
+            `, comunaFinal
+              ? [nombre, colorDelArchivo, JSON.stringify(geometry), codigoFinal, comunaFinal]
+              : [nombre, colorDelArchivo, JSON.stringify(geometry), codigoFinal]);
             if (upd.rows[0]) exitosos.push(upd.rows[0]);
             continue;
           }

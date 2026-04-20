@@ -179,15 +179,19 @@ export default function MapView({
   const kmlLayersRef     = useRef({});
   const cuadPoliLayer    = useRef(null);
   const cuadPuntosLayer  = useRef(null);
-  const filtrosRef       = useRef({ comuna: '' });
-  const kmlFileRef       = useRef(null);
-  const mapInitialized   = useRef(false);
+  const filtrosRef          = useRef({ comuna: '' });
+  const filtrosCuadRef      = useRef({ comuna: '', barrio: '' }); // filtros visuales de cuadrantes
+  const kmlFileRef          = useRef(null);
+  const mapInitialized      = useRef(false);
   // Edición de geometría desde el mapa
   const editGeomPoliLayer  = useRef(null);
   const editGeomPtosLayer  = useRef(null);
+  // Cache de todos los cuadrantes para filtrado local
+  const todosCuadrantesRef = useRef(null);
 
-  const [filtros,      setFiltros]      = useState({ comuna: '' });
-  const [loading,      setLoading]      = useState(false);
+  const [filtros,          setFiltros]          = useState({ comuna: '' });
+  const [filtrosCuad,      setFiltrosCuad]      = useState({ comuna: '', barrio: '' });
+  const [loading,          setLoading]          = useState(false);
   const [kmlCapas,     setKmlCapas]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('kmlCapas')) || []; } catch { return []; }
   });
@@ -202,17 +206,23 @@ export default function MapView({
   const esModoCrearCuadrante = modoMapa === 'crear-cuadrante';
   const esModoEditGeom       = !!editGeom;
 
-  // ── Cargar cuadrantes ───────────────────────────────────────
-  // Cada cuadrante usa su propio color guardado en BD.
-  // Soporta Polygon y MultiPolygon (datos de QGIS).
-  const cargarCuadrantes = useCallback(async () => {
+  // ── Renderizar cuadrantes en mapa (aplica filtros locales) ────
+  const renderizarCuadrantes = useCallback((geojson, fCuad) => {
     if (!cuadrantesLayer.current) return;
-    try {
-      const { data } = await api.get('/cuadrantes');
-      cuadrantesLayer.current.clearLayers();
-      if (!data.features?.length) return;
+    cuadrantesLayer.current.clearLayers();
+    if (!geojson?.features?.length) return;
 
-      L.geoJSON(data, {
+    // Filtrar features localmente — sin nueva petición al backend
+    const features = geojson.features.filter(f => {
+      const p = f.properties;
+      if (fCuad.comuna && (p.comuna || '').toLowerCase() !== fCuad.comuna.toLowerCase()) return false;
+      if (fCuad.barrio && (p.barrio  || '').toLowerCase() !== fCuad.barrio.toLowerCase())  return false;
+      return true;
+    });
+
+    if (!features.length) return;
+
+    L.geoJSON({ type: 'FeatureCollection', features }, {
         // Estilo base usando el color propio de cada cuadrante
         style: (feature) => {
           const color = feature.properties?.color || '#2563EB';
@@ -267,7 +277,6 @@ export default function MapView({
             btn.style.cssText = 'display:block;width:100%;padding:5px 0;background:#DC2626;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
             btn.addEventListener('click', () => {
               layer.closePopup();
-              // iniciarEditGeomMapa no está en scope aquí, usar evento global
               window.dispatchEvent(new CustomEvent('editar-geom-cuadrante', { detail: { feature } }));
             });
             div.appendChild(btn);
@@ -275,8 +284,17 @@ export default function MapView({
           });
         },
       }).addTo(cuadrantesLayer.current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Cargar cuadrantes desde API, cachear y renderizar ───────
+  const cargarCuadrantes = useCallback(async () => {
+    if (!cuadrantesLayer.current) return;
+    try {
+      const { data } = await api.get('/cuadrantes'); // siempre trae TODOS
+      todosCuadrantesRef.current = data;              // guardar cache completo
+      renderizarCuadrantes(data, filtrosCuadRef.current);
     } catch (err) { console.error('Error cuadrantes:', err); }
-  }, []);
+  }, [renderizarCuadrantes]);
 
   // ── Cargar pines ────────────────────────────────────────────
   const cargarPines = useCallback(async (f) => {
@@ -604,20 +622,25 @@ export default function MapView({
   }, [kmlCapas]);
 
   // ── Recargar datos cuando recargarTrigger cambia ────────────
-  // Permite que App.jsx dispare recarga sin desmontar el mapa
-  // (mantiene zoom, posición y estado KML)
   useEffect(() => {
     if (!recargarTrigger || !leafletMap.current) return;
     cargarCuadrantes();
     cargarPines(filtrosRef.current);
   }, [recargarTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Filtros ─────────────────────────────────────────────────
+  // ── Filtros de personas ─────────────────────────────────────
   useEffect(() => {
     filtrosRef.current = filtros;
     if (!leafletMap.current) return;
     cargarPines(filtros);
   }, [filtros]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Filtros de cuadrantes (local, sin nueva petición) ───────
+  useEffect(() => {
+    filtrosCuadRef.current = filtrosCuad;
+    if (!leafletMap.current || !todosCuadrantesRef.current) return;
+    renderizarCuadrantes(todosCuadrantesRef.current, filtrosCuad);
+  }, [filtrosCuad, renderizarCuadrantes]);
 
   useEffect(() => {
     if (selectedPin?.latitud && leafletMap.current) {
@@ -689,17 +712,70 @@ export default function MapView({
   const nPuntos = cuadranteEnCurso?.poligono?.length || 0;
   const cursor  = esModoCrearCuadrante || esModoEditGeom ? 'crosshair' : '';
 
+  // Barrios únicos de los cuadrantes cargados (para el selector)
+  const barriosEnMapa = todosCuadrantesRef.current
+    ? [...new Set(
+        todosCuadrantesRef.current.features
+          .map(f => f.properties.barrio)
+          .filter(Boolean)
+      )].sort()
+    : [];
+
   // ── Render ──────────────────────────────────────────────────
   return (
     <div style={{ position:'relative', height:'100%' }}>
 
       {/* Toolbar */}
       <div className="map-toolbar">
-        <select value={filtros.comuna} onChange={e=>setFiltros(f=>({...f,comuna:e.target.value}))} className="filter-select">
-          <option value="">Todas las comunas</option>
+        {/* Filtro personas por comuna */}
+        <select
+          value={filtros.comuna}
+          onChange={e=>setFiltros(f=>({...f,comuna:e.target.value}))}
+          className="filter-select"
+          title="Filtrar personas por comuna"
+        >
+          <option value="">👥 Todas las comunas</option>
           {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
         </select>
-        <button className="btn-secondary" onClick={cargarCuadrantes} title="Recargar cuadrantes">🔄 Cuadrantes</button>
+
+        {/* Divisor */}
+        <span style={{color:'var(--border)',fontSize:'18px',lineHeight:1}}>│</span>
+
+        {/* Filtro cuadrantes por comuna */}
+        <select
+          value={filtrosCuad.comuna}
+          onChange={e => setFiltrosCuad(f => ({ ...f, comuna: e.target.value, barrio: '' }))}
+          className="filter-select"
+          title="Filtrar cuadrantes por comuna"
+          style={{borderColor: filtrosCuad.comuna ? '#2563EB' : undefined}}
+        >
+          <option value="">🔲 Todas comunas</option>
+          {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+
+        {/* Filtro cuadrantes por barrio */}
+        <select
+          value={filtrosCuad.barrio}
+          onChange={e => setFiltrosCuad(f => ({ ...f, barrio: e.target.value }))}
+          className="filter-select"
+          title="Filtrar cuadrantes por barrio"
+          style={{borderColor: filtrosCuad.barrio ? '#2563EB' : undefined}}
+        >
+          <option value="">🏘️ Todos los barrios</option>
+          {barriosEnMapa.map(b=><option key={b} value={b}>{b}</option>)}
+        </select>
+
+        {/* Limpiar filtros de cuadrantes */}
+        {(filtrosCuad.comuna || filtrosCuad.barrio) && (
+          <button
+            className="btn-secondary"
+            onClick={() => setFiltrosCuad({ comuna: '', barrio: '' })}
+            title="Quitar filtros de cuadrantes"
+            style={{padding:'4px 8px',fontSize:'12px'}}
+          >✕ Cuadrantes</button>
+        )}
+
+        <button className="btn-secondary" onClick={cargarCuadrantes} title="Recargar cuadrantes">🔄</button>
         <label className={`btn-secondary ${kmlLoading?'disabled':''}`} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:'4px'}}>
           {kmlLoading?'⏳':'📂'} KML
           <input ref={kmlFileRef} type="file" accept=".kml" onChange={handleKmlImport} disabled={kmlLoading} style={{display:'none'}}/>

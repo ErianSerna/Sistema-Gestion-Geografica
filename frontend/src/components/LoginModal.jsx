@@ -82,7 +82,13 @@ export default function LoginModal({ onLogin }) {
         width: '360px', boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
       }}>
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '8px' }}>🗺️</div>
+          <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>
+            <img
+              src="/pacto_logo.png"
+              alt="Pacto Histórico"
+              style={{ height: '72px', width: 'auto', objectFit: 'contain' }}
+            />
+          </div>
           <h2 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 700, color: '#1e293b' }}>
             Sistema de Gestión Geográfica
           </h2>
