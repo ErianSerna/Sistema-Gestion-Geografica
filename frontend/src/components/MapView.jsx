@@ -978,7 +978,7 @@ export default function MapView({
 
           {/* Campo descripción */}
           <div style={{marginBottom:'12px'}}>
-            <label style={{fontSize:'11px',fontWeight:600,color:'#374151',display:'block',marginBottom:'3px'}}>Descripción</label>
+            <label style={{fontSize:'11px',fontWeight:600,color:'#374151',display:'block',marginBottom:'3px'}}>Observación</label>
             <input
               value={cuadForm.descripcion}
               onChange={e=>setCuadForm(f=>({...f,descripcion:e.target.value}))}
