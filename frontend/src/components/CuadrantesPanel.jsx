@@ -542,7 +542,7 @@ export default function CuadrantesPanel() {
               {errores.nombre && <span className="form-error">{errores.nombre}</span>}
             </div>
             <div className="form-field">
-              <label>Descripción</label>
+              <label>Observación</label>
               <input name="descripcion" value={form.descripcion||''} onChange={cambiar} placeholder="Opcional" />
             </div>
             <div className="form-field form-field--full">
@@ -619,7 +619,7 @@ export default function CuadrantesPanel() {
                 <th>Código</th>
                 <th>Comuna</th>
                 <th>Barrio/Origen</th>
-                <th>Descripción</th>
+                <th>Observación</th>
                 <th>Personas</th>
                 <th></th>
               </tr>
@@ -700,13 +700,13 @@ export default function CuadrantesPanel() {
                         ) : <span style={{ color:'#CBD5E1' }}>↳</span>}
                       </td>
 
-                      {/* Descripción */}
+                      {/* Observación */}
                       <td style={{ fontSize:'12px', color:'var(--text-secondary)', maxWidth:'160px' }}>
                         {esEditando ? (
                           <input
                             value={editando.descripcion || ''}
                             onChange={e => setEditando(prev => ({ ...prev, descripcion: e.target.value }))}
-                            placeholder="Descripción..."
+                            placeholder="Observación..."
                             style={{ width:'100%', padding:'3px 7px', borderRadius:'5px', border:'1.5px solid #D1D5DB', fontSize:'12px' }}
                           />
                         ) : (
