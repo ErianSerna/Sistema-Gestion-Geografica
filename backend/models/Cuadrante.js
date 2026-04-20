@@ -108,21 +108,36 @@ class Cuadrante {
   // ── Crear cuadrante individual ──────────────────────────────
   static async crear({ nombre, codigo, comuna, barrio, descripcion, color, geojson_geom }) {
     return withTransaction(async (client) => {
-      // Autogenerar código: C{N}-{BARRIO_EN_MAYUSCULAS}
-      // Si el usuario provee uno, usarlo; si no, generar automáticamente
+      // ── Generar código: {NOMBRE_LIMPIO}-{Barrio} ──────────────────
+      // Formato pedido: C1-Castilla, C3-Aranjuez, C2-Belén
+      // Reglas:
+      //   1. Si el usuario pasa un código explícito → usarlo tal cual
+      //   2. Si el nombre sigue patrón C\d+ (ej: "C1", "C2") → usarlo como prefijo
+      //   3. Si no → usar prefijo consecutivo C{n}
+      //   El sufijo siempre es el barrio con capitalización original (tildes incluidas)
       let codigoFinal;
       if (codigo && codigo.trim()) {
-        codigoFinal = codigo.trim().toUpperCase();
+        codigoFinal = codigo.trim();
       } else {
         // Obtener el próximo número consecutivo
         const countRes2 = await client.query('SELECT COUNT(*) AS n FROM cuadrantes');
         const n = parseInt(countRes2.rows[0].n) + 1;
-        // Sufijo: barrio en mayúsculas con espacios → guion bajo
+
+        // Prefijo: si el nombre ya es tipo "C1", "C2"... usarlo; si no, generar "C{n}"
+        const nombreLimpio = (nombre || '').trim();
+        const prefijo = /^C\d+$/i.test(nombreLimpio)
+          ? nombreLimpio.toUpperCase()
+          : `C${n}`;
+
+        // Sufijo: barrio con capitalización original, espacios → guion bajo
+        // Preservar tildes y ñ (no normalizar a ASCII)
         const sufijo = (barrio && barrio.trim())
-          ? barrio.trim().toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '')
-          : 'SIN_BARRIO';
-        const candidato = `C${n}-${sufijo}`;
-        // Evitar duplicados: si ya existe, agregar -2, -3, etc.
+          ? barrio.trim().replace(/\s+/g, '_')
+          : null;
+
+        const candidato = sufijo ? `${prefijo}-${sufijo}` : prefijo;
+
+        // Evitar duplicados: si ya existe, agregar sufijo numérico
         let intentos = 0;
         let codigoPrueba = candidato;
         while (true) {
@@ -415,6 +430,54 @@ class Cuadrante {
       );
       return result.rows[0] || null;
     });
+  }
+
+  // ── Asignar comuna a TODOS los cuadrantes de un barrio ───────
+  static async actualizarComunaPorBarrio(barrio, comuna) {
+    const result = await query(
+      `UPDATE cuadrantes
+       SET comuna = $1, updated_at = NOW()
+       WHERE LOWER(TRIM(barrio)) = LOWER(TRIM($2))
+       RETURNING id`,
+      [comuna || null, barrio]
+    );
+    return result.rowCount; // cantidad de cuadrantes actualizados
+  }
+
+  // ── Backfill: generar códigos para cuadrantes que tienen codigo NULL ─
+  // Llamado desde el endpoint POST /api/cuadrantes/backfill-codigos
+  static async backfillCodigos() {
+    // Traer los que no tienen código, ordenados por id para consecutivos estables
+    const { rows } = await query(`
+      SELECT id, nombre, barrio
+      FROM cuadrantes
+      WHERE codigo IS NULL OR TRIM(codigo) = ''
+      ORDER BY id
+    `);
+
+    let actualizados = 0;
+    for (const c of rows) {
+      const prefijo = /^C\d+$/i.test((c.nombre || '').trim())
+        ? c.nombre.trim().toUpperCase()
+        : `C${c.id}`;
+      const sufijo = c.barrio ? c.barrio.trim().replace(/\s+/g, '_') : null;
+      let candidato = sufijo ? `${prefijo}-${sufijo}` : prefijo;
+
+      // Evitar duplicados
+      let intentos = 0;
+      let codigoPrueba = candidato;
+      while (true) {
+        intentos++;
+        const existe = await query('SELECT 1 FROM cuadrantes WHERE codigo=$1 AND id!=$2', [codigoPrueba, c.id]);
+        if (!existe.rows.length) break;
+        codigoPrueba = `${candidato}-${intentos + 1}`;
+        if (intentos > 50) { codigoPrueba = `C${c.id}-${Date.now()}`; break; }
+      }
+
+      await query('UPDATE cuadrantes SET codigo=$1, updated_at=NOW() WHERE id=$2', [codigoPrueba, c.id]);
+      actualizados++;
+    }
+    return actualizados;
   }
 }
 

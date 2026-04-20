@@ -37,6 +37,9 @@ export default function CuadrantesPanel() {
   // Filtros
   const [filtroComunas, setFiltroComunas] = useState('');
   const [filtroBarrio,  setFiltroBarrio]  = useState('');
+  // Asignación masiva de comuna por barrio
+  const [asignComuna,   setAsignComuna]   = useState({ barrio: '', comuna: '', guardando: false });
+  const [backfilling,   setBackfilling]   = useState(false);
 
   const geojsonFileRef  = useRef(null);
   const mapRef          = useRef(null);
@@ -213,6 +216,38 @@ export default function CuadrantesPanel() {
     } catch { toast.error('Error actualizando'); }
   };
 
+  // Asignar masivamente una comuna a todos los cuadrantes de un barrio
+  const asignarComunaPorBarrio = async () => {
+    if (!asignComuna.barrio || !asignComuna.comuna) {
+      toast.error('Selecciona barrio y comuna'); return;
+    }
+    setAsignComuna(prev => ({ ...prev, guardando: true }));
+    try {
+      const { data } = await api.patch(
+        `/cuadrantes/barrio/${encodeURIComponent(asignComuna.barrio)}/comuna`,
+        { comuna: asignComuna.comuna }
+      );
+      toast.success(`✅ ${data.actualizados} cuadrantes de "${asignComuna.barrio}" → ${asignComuna.comuna}`);
+      setAsignComuna({ barrio: '', comuna: '', guardando: false });
+      cargar();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error asignando comuna');
+      setAsignComuna(prev => ({ ...prev, guardando: false }));
+    }
+  };
+
+  // Generar códigos para cuadrantes sin código
+  const ejecutarBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const { data } = await api.post('/cuadrantes/backfill-codigos');
+      toast.success(`✅ ${data.actualizados} cuadrantes con código generado`);
+      cargar();
+    } catch (err) {
+      toast.error('Error generando códigos');
+    } finally { setBackfilling(false); }
+  };
+
   const cambiarColor = async (id, color) => {
     try {
       await api.patch(`/cuadrantes/${id}/color`, { color });
@@ -350,6 +385,13 @@ export default function CuadrantesPanel() {
     grupos[barrio].push(f);
   });
 
+  // Barrios únicos de todos los cuadrantes (para el selector de asignación)
+  // const barriosUnicos = [...new Set(cuadrantes.map(f => f.properties.barrio).filter(Boolean))].sort();
+  // Cuadrantes sin código (para mostrar aviso de backfill)
+  const sinCodigo = cuadrantes.filter(f => !f.properties.codigo).length;
+  // Cuadrantes sin comuna
+  const sinComuna = cuadrantes.filter(f => !f.properties.comuna).length;
+
   return (
     <>
     <div className="cuadrantes-panel">
@@ -372,6 +414,83 @@ export default function CuadrantesPanel() {
           </div>
         )}
       </div>
+
+      {/* ── Panel de mantenimiento ─────────────────────────────── */}
+      {!modoCrear && (sinCodigo > 0 || sinComuna > 0) && (
+        <div style={{
+          background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px',
+          padding: '14px 16px', marginBottom: '16px',
+        }}>
+          <p style={{ margin: '0 0 12px', fontWeight: 600, fontSize: '13px', color: '#92400E' }}>
+            ⚠️ Mantenimiento necesario
+            {sinCodigo > 0 && ` — ${sinCodigo} cuadrante${sinCodigo > 1 ? 's' : ''} sin código`}
+            {sinComuna > 0 && ` — ${sinComuna} cuadrante${sinComuna > 1 ? 's' : ''} sin comuna`}
+          </p>
+
+          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+
+            {/* Backfill de códigos */}
+            {sinCodigo > 0 && (
+              <div>
+                <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#374151', fontWeight: 500 }}>
+                  Generar códigos faltantes (formato C1-Barrio):
+                </p>
+                <button
+                  className="btn-secondary"
+                  onClick={ejecutarBackfill}
+                  disabled={backfilling}
+                  style={{ fontSize: '12px', padding: '6px 14px' }}
+                >
+                  {backfilling ? '⏳ Generando...' : '🔧 Generar códigos'}
+                </button>
+              </div>
+            )}
+
+            {/* Asignación masiva de comuna por barrio */}
+            {sinComuna > 0 && (
+              <div style={{ flex: 1, minWidth: '280px' }}>
+                <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#374151', fontWeight: 500 }}>
+                  Asignar comuna a todos los cuadrantes de un barrio:
+                </p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <select
+                    value={asignComuna.barrio}
+                    onChange={e => setAsignComuna(prev => ({ ...prev, barrio: e.target.value }))}
+                    className="filter-select"
+                    style={{ minWidth: '150px' }}
+                  >
+                    <option value="">Seleccionar barrio</option>
+                    {barriosUnicos.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={asignComuna.comuna}
+                    onChange={e => setAsignComuna(prev => ({ ...prev, comuna: e.target.value }))}
+                    className="filter-select"
+                    style={{ minWidth: '150px' }}
+                  >
+                    <option value="">Seleccionar comuna</option>
+                    {COMUNAS_MEDELLIN.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    className="btn-primary"
+                    onClick={asignarComunaPorBarrio}
+                    disabled={asignComuna.guardando || !asignComuna.barrio || !asignComuna.comuna}
+                    style={{ fontSize: '12px', padding: '6px 14px' }}
+                  >
+                    {asignComuna.guardando ? '⏳...' : '✅ Asignar comuna'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Filtros ─────────────────────────────────────────── */}
       {!modoCrear && (
@@ -500,6 +619,7 @@ export default function CuadrantesPanel() {
                 <th>Código</th>
                 <th>Comuna</th>
                 <th>Barrio/Origen</th>
+                <th>Descripción</th>
                 <th>Personas</th>
                 <th></th>
               </tr>
@@ -578,6 +698,22 @@ export default function CuadrantesPanel() {
                             </span>
                           )
                         ) : <span style={{ color:'#CBD5E1' }}>↳</span>}
+                      </td>
+
+                      {/* Descripción */}
+                      <td style={{ fontSize:'12px', color:'var(--text-secondary)', maxWidth:'160px' }}>
+                        {esEditando ? (
+                          <input
+                            value={editando.descripcion || ''}
+                            onChange={e => setEditando(prev => ({ ...prev, descripcion: e.target.value }))}
+                            placeholder="Descripción..."
+                            style={{ width:'100%', padding:'3px 7px', borderRadius:'5px', border:'1.5px solid #D1D5DB', fontSize:'12px' }}
+                          />
+                        ) : (
+                          <span title={p.descripcion || ''} style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'block' }}>
+                            {p.descripcion || <span style={{ color:'#CBD5E1' }}>—</span>}
+                          </span>
+                        )}
                       </td>
 
                       <td>{p.total_personas}</td>
