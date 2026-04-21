@@ -309,11 +309,37 @@ export default function MapView({
       if (!data.features?.length) return;
       L.geoJSON(data, {
         pointToLayer: (feature, latlng) =>
-          L.marker(latlng, { icon: crearIcono() }),
+          L.marker(latlng, { icon: crearIcono(), draggable: true }),
         onEachFeature: (feature, layer) => {
           const p = feature.properties;
           layer.bindPopup(() => crearPopupDOM(p), { maxWidth: 280 });
           layer.on('click', (e) => { L.DomEvent.stopPropagation(e); onPinClick(p); });
+
+          // ── Drag & drop: guardar nueva posición al soltar ──────────
+          layer.on('dragstart', () => {
+            // Cerrar popup mientras se arrastra
+            layer.closePopup();
+          });
+
+          layer.on('dragend', async (e) => {
+            const { lat, lng } = e.target.getLatLng();
+            const toastId = toast.loading(`Guardando posición de ${p.nombre}...`);
+            try {
+              await api.patch(`/personas/${p.id}/ubicacion`, {
+                latitud:  lat,
+                longitud: lng,
+              });
+              // Actualizar las propiedades del feature en memoria
+              p.latitud  = lat;
+              p.longitud = lng;
+              toast.success(`📍 ${p.nombre} movido correctamente`, { id: toastId });
+            } catch (err) {
+              // Revertir el marcador a su posición original
+              e.target.setLatLng([p.latitud, p.longitud]);
+              toast.error('Error guardando la nueva posición', { id: toastId });
+              console.error('[Drag] Error actualizando persona:', err);
+            }
+          });
         },
       }).addTo(markersLayer.current);
     } catch (err) {
@@ -1026,6 +1052,9 @@ export default function MapView({
       <div className="map-legend">
         <div className="legend-item"><span className="pin-dot" style={{background:'#2563EB'}}/>Personas</div>
         <div className="legend-item"><span className="cuadrante-square"/>Cuadrante</div>
+        <div className="legend-item" style={{color:'var(--text-secondary)',fontSize:'11px',fontStyle:'italic'}}>
+          ✋ Arrastra un pin para moverlo
+        </div>
       </div>
 
       <div ref={mapRef} style={{width:'100%',height:'100%',minHeight:'500px',cursor}} />

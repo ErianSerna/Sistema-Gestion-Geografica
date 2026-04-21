@@ -82,9 +82,10 @@ async function importarDesdeExcel(buffer) {
 
   for (let i = 0; i < filas.length; i++) {
     const fila = filas[i];
+    // Crear objeto limpio por fila — nunca reutilizar el de la iteración anterior
     const p = {};
 
-    // Mapear valores
+    // Mapear valores de esta fila únicamente
     for (const [original, normalizado] of Object.entries(mapeoColumnas)) {
       p[normalizado] = fila[original];
     }
@@ -110,35 +111,57 @@ async function importarDesdeExcel(buffer) {
     const votaRaw = String(p.vota_pacto ?? '').toLowerCase().trim();
     p.vota_pacto = ['si','sí','yes','1','true','x','✓','verdadero'].includes(votaRaw);
 
-    // Limpiar coordenadas
-    const lat = p.latitud  !== '' && p.latitud  != null ? parseFloat(p.latitud)  : NaN;
-    const lon = p.longitud !== '' && p.longitud != null ? parseFloat(p.longitud) : NaN;
+    // ── Coordenadas: leer SOLO de esta fila ─────────────────────────
+    // Importante: limpiar explícitamente para que nunca hereden valores
+    // de iteraciones anteriores si el campo viene vacío en esta fila.
+    const latRaw = p.latitud  != null && String(p.latitud).trim()  !== '' ? parseFloat(p.latitud)  : NaN;
+    const lonRaw = p.longitud != null && String(p.longitud).trim() !== '' ? parseFloat(p.longitud) : NaN;
 
-    if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-      p.latitud  = lat;
-      p.longitud = lon;
+    // Borrar los campos crudos — se sobreescribirán con valores numéricos limpios
+    delete p.latitud;
+    delete p.longitud;
+
+    if (!isNaN(latRaw) && !isNaN(lonRaw) && Math.abs(latRaw) <= 90 && Math.abs(lonRaw) <= 180) {
+      // Coordenadas válidas en el Excel — usarlas directamente
+      p.latitud  = latRaw;
+      p.longitud = lonRaw;
+      console.log(`[Excel] Fila ${i+2}: coords del Excel → ${latRaw}, ${lonRaw}`);
     } else {
-      // Geocodificar si tiene dirección
-      if (p.direccion && String(p.direccion).trim()) {
+      // Sin coordenadas válidas — geocodificar la dirección de ESTA fila
+      const direccionFila = p.direccion ? String(p.direccion).trim() : '';
+      if (direccionFila) {
+        console.log(`[Excel] Fila ${i+2}: geocodificando "${direccionFila}"...`);
         try {
           const coords = await geocodingService.geocodificar(
-            String(p.direccion), p.barrio || p.comuna || '', 'Medellín, Antioquia, Colombia'
+            direccionFila,
+            p.barrio  ? String(p.barrio).trim()  : (p.comuna ? String(p.comuna).trim() : ''),
+            'Medellín, Antioquia, Colombia'
           );
-          if (coords) {
+          if (coords && !isNaN(coords.latitud) && !isNaN(coords.longitud)) {
             p.latitud  = coords.latitud;
             p.longitud = coords.longitud;
+            console.log(`[Excel] Fila ${i+2}: geocodificado → ${coords.latitud}, ${coords.longitud}`);
           } else {
-            erroresValidacion.push({ fila: i+2, error: `No se pudo geocodificar: ${p.direccion}` });
+            console.warn(`[Excel] Fila ${i+2}: geocoding sin resultado para "${direccionFila}"`);
+            erroresValidacion.push({ fila: i+2, error: `No se pudo geocodificar: ${direccionFila}` });
             continue;
           }
         } catch (geoErr) {
-          erroresValidacion.push({ fila: i+2, error: `Error geocodificando: ${geoErr.message}` });
+          console.error(`[Excel] Fila ${i+2}: error geocodificando:`, geoErr.message);
+          erroresValidacion.push({ fila: i+2, error: `Error geocodificando fila ${i+2}: ${geoErr.message}` });
           continue;
         }
       } else {
-        erroresValidacion.push({ fila: i+2, error: 'Se necesita lat/lon o dirección' });
+        erroresValidacion.push({ fila: i+2, error: `Fila ${i+2}: se necesita latitud/longitud o dirección` });
         continue;
       }
+    }
+
+    // Validación final: asegurarse de que latitud y longitud son números válidos
+    if (typeof p.latitud !== 'number' || typeof p.longitud !== 'number' ||
+        isNaN(p.latitud) || isNaN(p.longitud)) {
+      erroresValidacion.push({ fila: i+2, error: `Coordenadas finales inválidas para fila ${i+2}` });
+      continue;
     }
 
     personas.push(p);
