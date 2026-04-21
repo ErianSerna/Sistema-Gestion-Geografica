@@ -243,11 +243,29 @@ export default function PersonaTable({ onEdit, sesion }) {
                     const listaOtros     = cuadBarrio.length > 0
                       ? cuadrantes.filter(f => !cuadBarrio.includes(f))
                       : [];
-                    // Etiqueta: "C1 - NOMBRE EN MAYÚSCULAS"
+                    // Etiqueta: "C1-La Esperanza"
+                    // El codigo ya incluye el prefijo (ej: "C1-LA_ESPERANZA"),
+                    // así que lo limpiamos y usamos directamente, sin duplicar el nombre.
                     const etiqueta = (f) => {
-                      const cod = f.properties.codigo || '';
-                      const nom = (f.properties.nombre || '').toUpperCase();
-                      return cod ? `${cod} - ${nom}` : nom;
+                      const cod     = f.properties.codigo || '';
+                      const barrio  = f.properties.barrio  || '';
+                      const nombre  = f.properties.nombre  || '';
+
+                      if (cod) {
+                        // Extraer prefijo (todo lo que está antes del primer '-')
+                        const partes  = cod.split('-');
+                        const prefijo = partes[0]; // "C1"
+
+                        // Usar el barrio real si existe, sino el resto del código limpio
+                        const etiqBarrio = barrio
+                          ? barrio.replace(/_/g, ' ')
+                          : partes.slice(1).join(' ').replace(/_/g, ' ');
+
+                        if (etiqBarrio) return `${prefijo}-${etiqBarrio}`;
+                        return prefijo;
+                      }
+                      // Sin código: usar el nombre tal cual
+                      return nombre;
                     };
                     return (
                       <select

@@ -54,6 +54,37 @@ router.patch('/:id/cuadrante', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PATCH /api/personas/:id/ubicacion — actualizar lat/lon desde drag & drop
+router.patch('/:id/ubicacion', async (req, res, next) => {
+  try {
+    const { latitud, longitud } = req.body;
+    const lat = parseFloat(latitud);
+    const lon = parseFloat(longitud);
+
+    if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+      return res.status(400).json({ error: 'Coordenadas inválidas' });
+    }
+
+    const result = await query(
+      `UPDATE personas SET
+         latitud      = $1,
+         longitud     = $2,
+         geom         = ST_SetSRID(ST_MakePoint($2::numeric, $1::numeric), 4326),
+         cuadrante_id = (
+           SELECT c.id FROM cuadrantes c
+           WHERE ST_Contains(c.geom, ST_SetSRID(ST_MakePoint($2::numeric, $1::numeric), 4326))
+           LIMIT 1
+         ),
+         updated_at   = NOW()
+       WHERE id = $3
+       RETURNING id, latitud, longitud, cuadrante_id`,
+      [lat, lon, req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'No encontrado' });
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
 // ── Rutas estándar ────────────────────────────────────────────
 router.get('/',        ctrl.listar);
 router.get('/geojson', ctrl.geojson);
