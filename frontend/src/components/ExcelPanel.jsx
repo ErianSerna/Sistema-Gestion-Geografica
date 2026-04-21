@@ -151,9 +151,38 @@ export default function ExcelPanel({ onImportado }) {
               <summary style={{ cursor: 'pointer', color: '#B45309' }}>
                 ⚠️ {resultado.errores_validacion.length} filas con problemas
               </summary>
-              <ul className="error-list">
-                {resultado.errores_validacion.slice(0, 10).map((e, i) => (
+              <ul
+                className="error-list"
+                style={{
+                  maxHeight: '280px',
+                  overflowY: 'auto',
+                  margin: '8px 0 0',
+                  paddingRight: '4px',
+                }}
+              >
+                {resultado.errores_validacion.map((e, i) => (
                   <li key={i}>Fila {e.fila}: {e.error}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {resultado.errores_bd?.length > 0 && (
+            <details style={{ marginTop: '8px' }}>
+              <summary style={{ cursor: 'pointer', color: '#DC2626' }}>
+                🔴 {resultado.errores_bd.length} errores de base de datos
+              </summary>
+              <ul
+                className="error-list"
+                style={{
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  margin: '8px 0 0',
+                  paddingRight: '4px',
+                }}
+              >
+                {resultado.errores_bd.map((e, i) => (
+                  <li key={i}>{e.persona?.nombre || `Registro ${i + 1}`}: {e.error}</li>
                 ))}
               </ul>
             </details>

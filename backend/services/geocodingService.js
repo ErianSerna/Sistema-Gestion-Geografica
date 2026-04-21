@@ -32,12 +32,42 @@ async function geocodificar(direccion, barrio = '', ciudad = 'Medellín, Antioqu
   // "Carrera 50 # 45-20" → "Carrera 50 45-20" (Nominatim no entiende "#")
   const dirNorm = normalizarDireccionColombia(direccion);
 
-  // Intentos en orden de especificidad
-  const intentos = [
-    `${dirNorm}, ${barrio}, ${ciudad}`.trim().replace(/,\s*,/g, ','),
-    `${dirNorm}, ${ciudad}`,
-    barrio ? `${barrio}, ${ciudad}` : null
-  ].filter(Boolean);
+  // Limpiar barrio — se usa en TODAS las queries para reducir ambigüedad.
+  // Calles como "Calle 30" o "Carrera 50" se repiten en múltiples comunas
+  // de Medellín; sin el barrio, Nominatim puede devolver cualquiera de ellas.
+  const barrioLimpio = (barrio || '').trim();
+
+  // ── Construir queries de mayor a menor especificidad ─────────────────
+  // La ciudad siempre se expande a "Medellín, Antioquia, Colombia" para
+  // evitar coincidencias con municipios homónimos en otros departamentos.
+  const intentos = [];
+
+  if (dirNorm && barrioLimpio) {
+    // Intento 1 (más específico): dirección + barrio + ciudad completa
+    intentos.push(`${dirNorm}, ${barrioLimpio}, Medellín, Antioquia, Colombia`);
+    // Intento 2: dirección + barrio + solo ciudad (a veces Nominatim prefiere esto)
+    intentos.push(`${dirNorm}, ${barrioLimpio}, Medellín`);
+  }
+
+  if (dirNorm) {
+    // Intento 3: dirección + ciudad completa (sin barrio, por si el barrio confunde)
+    intentos.push(`${dirNorm}, Medellín, Antioquia, Colombia`);
+    // Intento 4: dirección + solo ciudad
+    intentos.push(`${dirNorm}, Medellín`);
+  }
+
+  if (barrioLimpio) {
+    // Intento 5 (fallback): solo barrio + ciudad — devuelve el centroide del barrio
+    intentos.push(`${barrioLimpio}, Medellín, Antioquia, Colombia`);
+  }
+
+  // ── Logs de diagnóstico ───────────────────────────────────────────────
+  console.log(`[Geocoding] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  console.log(`[Geocoding] Dirección original : "${direccion}"`);
+  console.log(`[Geocoding] Barrio             : "${barrioLimpio || '(sin barrio)'}"`);
+  console.log(`[Geocoding] Dir. normalizada   : "${dirNorm}"`);
+  console.log(`[Geocoding] Queries (${intentos.length}): `);
+  intentos.forEach((q, i) => console.log(`[Geocoding]   ${i + 1}. ${q}`));
 
   for (const query of intentos) {
     const cacheKey = query.toLowerCase();
@@ -46,7 +76,8 @@ async function geocodificar(direccion, barrio = '', ciudad = 'Medellín, Antioqu
     if (cache.has(cacheKey)) {
       const cached = cache.get(cacheKey);
       if (Date.now() - cached.timestamp < CACHE_TTL) {
-        console.log(`[Geocoding] Cache hit: ${query}`);
+        console.log(`[Geocoding] 💾 Cache hit: "${query}"`);
+        console.log(`[Geocoding] → ${cached.data.latitud}, ${cached.data.longitud} (${cached.data.display_name})`);
         return cached.data;
       }
     }
@@ -56,6 +87,8 @@ async function geocodificar(direccion, barrio = '', ciudad = 'Medellín, Antioqu
     const esperarMs = Math.max(0, 1100 - (ahora - ultimaPeticion));
     if (esperarMs > 0) await delay(esperarMs);
     ultimaPeticion = Date.now();
+
+    console.log(`[Geocoding] 🌐 Consultando: "${query}"`);
 
     try {
       const response = await axios.get('https://nominatim.openstreetmap.org/search', {
@@ -84,27 +117,30 @@ async function geocodificar(direccion, barrio = '', ciudad = 'Medellín, Antioqu
         };
 
         // Validar que esté dentro del área metropolitana de Medellín
-        // Bounding box aproximado: lat 5.9-6.5, lon -75.8 a -75.4
         if (!estaEnMedellin(coords.latitud, coords.longitud)) {
-          console.warn(`[Geocoding] Resultado fuera de Medellín: ${resultado.display_name}`);
+          console.warn(`[Geocoding] ⚠️  Fuera de Medellín — descartando: "${resultado.display_name}" (${coords.latitud}, ${coords.longitud})`);
           continue;
         }
 
         // Guardar en caché
         cache.set(cacheKey, { data: coords, timestamp: Date.now() });
-        console.log(`[Geocoding] ✅ ${query} → ${coords.latitud}, ${coords.longitud}`);
+        console.log(`[Geocoding] ✅ Resultado: ${coords.latitud}, ${coords.longitud}`);
+        console.log(`[Geocoding]    Fuente   : "${resultado.display_name}"`);
+        console.log(`[Geocoding]    Query    : "${query}"`);
         return coords;
+      } else {
+        console.log(`[Geocoding] 🔍 Sin resultados para: "${query}"`);
       }
     } catch (err) {
       if (err.code === 'ECONNABORTED') {
-        console.warn(`[Geocoding] Timeout para: ${query}`);
+        console.warn(`[Geocoding] ⏱️  Timeout para: "${query}"`);
       } else {
-        console.error(`[Geocoding] Error: ${err.message}`);
+        console.error(`[Geocoding] ❌ Error HTTP: ${err.message}`);
       }
     }
   }
 
-  console.warn(`[Geocoding] ❌ No se encontró: ${direccion}`);
+  console.warn(`[Geocoding] ❌ No se encontró ningún resultado para: "${direccion}" (barrio: "${barrioLimpio}")`);
   return null;
 }
 

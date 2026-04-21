@@ -16,7 +16,8 @@ const COMUNAS_MEDELLIN = [
   'Popular','Santa Cruz','Manrique','Aranjuez','Castilla',
   'Doce de Octubre','Robledo','Villa Hermosa','Buenos Aires',
   'La Candelaria','Laureles','La América','San Javier',
-  'El Poblado','Guayabal','Belén',
+  'El Poblado','Guayabal','Belén','San Sebastián de Palmitas', 'San Cristóbal', 'Altavista',
+  'San Antonio de Prado', 'Santa Elena'
 ];
 
 const FORM_INICIAL = { nombre: '', descripcion: '', barrio: '' };
