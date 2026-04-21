@@ -21,7 +21,8 @@ const COMUNAS_MEDELLIN = [
   'Popular','Santa Cruz','Manrique','Aranjuez','Castilla',
   'Doce de Octubre','Robledo','Villa Hermosa','Buenos Aires',
   'La Candelaria','Laureles','La América','San Javier',
-  'El Poblado','Guayabal','Belén'
+  'El Poblado','Guayabal','Belén','San Sebastián de Palmitas', 'San Cristóbal', 'Altavista',
+  'San Antonio de Prado', 'Santa Elena'
 ];
 
 const KML_COLORS = ['#7C3AED','#0891B2','#D97706','#059669','#DC2626','#DB2777','#2563EB','#65A30D'];
