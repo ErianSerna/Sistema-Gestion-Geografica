@@ -9,7 +9,7 @@ import { useState } from 'react';
 // Para agregar más coordinadores, copiar una línea con rol 'coordinador'
 // y cambiar usuario, clave y comuna.
 const USUARIOS = [
-  { usuario: 'admin',     clave: 'admin2024',  rol: 'admin',       comuna: null },
+  { usuario: 'admin',     clave: 'admin2026',  rol: 'admin',       comuna: null },
   { usuario: 'comuna1',   clave: 'coord123',   rol: 'coordinador', comuna: 'Popular' },
   { usuario: 'comuna2',   clave: 'coord123',   rol: 'coordinador', comuna: 'Santa Cruz' },
   { usuario: 'comuna3',   clave: 'coord123',   rol: 'coordinador', comuna: 'Manrique' },
@@ -106,8 +106,7 @@ export default function LoginModal({ onLogin }) {
               value={usuario}
               onChange={e => { setUsuario(e.target.value); setError(''); }}
               autoFocus
-              autoComplete="username"
-              placeholder="Ej: admin"
+              autoComplete="false"
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: '8px',
                 border: error ? '1.5px solid #DC2626' : '1.5px solid #D1D5DB',
