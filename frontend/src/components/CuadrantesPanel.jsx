@@ -95,9 +95,15 @@ export default function CuadrantesPanel() {
     const timer = setTimeout(() => {
       if (!mapRef.current || leafletMap.current) return;
       const map = L.map(mapRef.current, { center: [6.2518, -75.5636], zoom: 13 });
-      L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
-        attribution: '© CartoDB', maxZoom: 19,
+
+      // L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
+      //   attribution: '© CartoDB', maxZoom: 19,
+      // }).addTo(map);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+       attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
       }).addTo(map);
+
       poliLayer.current   = L.layerGroup().addTo(map);
       puntosLayer.current = L.layerGroup().addTo(map);
 
