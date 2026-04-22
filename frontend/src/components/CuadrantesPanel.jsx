@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
+import 'leaflet-providers';
 import 'leaflet/dist/leaflet.css';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -95,9 +96,21 @@ export default function CuadrantesPanel() {
     const timer = setTimeout(() => {
       if (!mapRef.current || leafletMap.current) return;
       const map = L.map(mapRef.current, { center: [6.2518, -75.5636], zoom: 13 });
-      L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
-        attribution: '© CartoDB', maxZoom: 19,
-      }).addTo(map);
+
+      //El original
+      // L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
+      //   attribution: '© CartoDB', maxZoom: 19,
+      // }).addTo(map);
+
+      //El que es con token
+      // L.tileLayer('https://tile.jawg.io/jawg-streets/{z}/{x}/{y}{r}.png?access-token=BBCSV1F7JlcqhNzh2L4qEwWO35dfjfq3dkfuXSLRwKTs8GKCmp3KTtGKHaaDSHyn', {
+      // attribution: '© Jawg © OpenStreetMap',
+      // maxZoom: 18
+      // }).addTo(map);
+
+    // Mapa base con leaflet-providers
+    L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map);
+
       poliLayer.current   = L.layerGroup().addTo(map);
       puntosLayer.current = L.layerGroup().addTo(map);
 
