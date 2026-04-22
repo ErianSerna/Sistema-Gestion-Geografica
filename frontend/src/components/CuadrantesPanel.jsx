@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
+import 'leaflet-providers';
 import 'leaflet/dist/leaflet.css';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -107,10 +108,8 @@ export default function CuadrantesPanel() {
       // maxZoom: 18
       // }).addTo(map);
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19
-      }).addTo(map);
+    // Mapa base con leaflet-providers
+    L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map);
 
       poliLayer.current   = L.layerGroup().addTo(map);
       puntosLayer.current = L.layerGroup().addTo(map);
