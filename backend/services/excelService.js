@@ -140,7 +140,17 @@ async function importarDesdeExcel(buffer) {
           if (coords && !isNaN(coords.latitud) && !isNaN(coords.longitud)) {
             p.latitud  = coords.latitud;
             p.longitud = coords.longitud;
-            console.log(`[Excel] Fila ${i+2}: geocodificado → ${coords.latitud}, ${coords.longitud}`);
+            if (coords.esFallback) {
+              // Fallback: se usó el centroide del barrio — registrar como advertencia
+              console.warn(`[Excel] Fila ${i+2}: FALLBACK barrio "${p.barrio}" → ${coords.latitud.toFixed(6)}, ${coords.longitud.toFixed(6)}`);
+              erroresValidacion.push({
+                fila: i+2,
+                error: `Dirección no geocodificada con precisión; se usó el centro del barrio "${p.barrio}" como aproximación (${coords.latitud.toFixed(5)}, ${coords.longitud.toFixed(5)})`,
+              });
+              // Sí agregamos la persona, pero con la advertencia registrada
+            } else {
+              console.log(`[Excel] Fila ${i+2}: geocodificado ✅ → ${coords.latitud}, ${coords.longitud}`);
+            }
           } else {
             console.warn(`[Excel] Fila ${i+2}: geocoding sin resultado para "${direccionFila}"`);
             erroresValidacion.push({ fila: i+2, error: `No se pudo geocodificar: ${direccionFila}` });
