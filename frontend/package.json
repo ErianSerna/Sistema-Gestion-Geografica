@@ -8,15 +8,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "axios": "^1.6.0",
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
-    "react-leaflet": "^4.2.1",
-    "axios": "^1.6.0",
-    "xlsx": "^0.18.5",
+    "leaflet-providers": "^3.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
+    "react-leaflet": "^4.2.1",
     "vite": "^5.0.0",
-    "@vitejs/plugin-react": "^4.2.0"
+    "xlsx": "^0.18.5"
   }
 }

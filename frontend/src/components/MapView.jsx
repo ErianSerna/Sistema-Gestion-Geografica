@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-providers';
 import api from '../utils/api';
 import { kmlToGeoJSON } from '../utils/kmlParser';
 import toast from 'react-hot-toast';
@@ -403,13 +404,19 @@ export default function MapView({
     map.getPane('kmlLabelPane').style.zIndex = 250;
     map.getPane('kmlLabelPane').style.pointerEvents = 'none';
 
+    //El que tenia originalmente
     // L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
     //   attribution: '© CartoDB © OpenStreetMap', maxZoom: 19,
     // }).addTo(map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-     attribution: '© OpenStreetMap contributors',
-     maxZoom: 19
-    }).addTo(map);
+
+    //El que es con token
+    // L.tileLayer('https://tile.jawg.io/jawg-streets/{z}/{x}/{y}{r}.png?access-token=BBCSV1F7JlcqhNzh2L4qEwWO35dfjfq3dkfuXSLRwKTs8GKCmp3KTtGKHaaDSHyn', {
+    // attribution: '© Jawg © OpenStreetMap',
+    // maxZoom: 18
+    // }).addTo(map);
+    
+    // Mapa base con leaflet-providers
+    L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map);
 
     cuadrantesLayer.current    = L.layerGroup().addTo(map);
     markersLayer.current       = L.layerGroup().addTo(map);
