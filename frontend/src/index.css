@@ -144,3 +144,285 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
 .kml-layer-name     { flex:1; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .kml-btn            { padding:2px 5px; border-radius:4px; border:0.5px solid var(--border); background:transparent; cursor:pointer; font-size:12px; flex-shrink:0; }
 .kml-btn--danger:hover { background:#FEE2E2; }
+
+/* ============================================================
+   RESPONSIVE — Móvil (max 768px)
+   Todos los estilos desktop se mantienen intactos arriba.
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+  /* ── Header ──────────────────────────────────────────────── */
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .header-brand h1 { font-size: 14px; }
+  .header-brand p  { font-size: 11px; }
+
+  /* Tabs: scroll horizontal para que quepan todas */
+  .tab-nav {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    flex-wrap: nowrap;
+  }
+  .tab-nav::-webkit-scrollbar { display: none; }
+
+  .tab-btn {
+    white-space: nowrap;
+    font-size: 12px;
+    padding: 5px 10px;
+    flex-shrink: 0;
+  }
+
+  /* Botones de acción del header: fila compacta */
+  .app-header > div:last-child {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* ── Mapa ────────────────────────────────────────────────── */
+  .map-toolbar {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    width: auto;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 14px;
+    /* En móvil reducir tamaño de selects del mapa */
+  }
+
+  .map-toolbar .filter-select {
+    font-size: 12px;
+    padding: 4px 6px;
+    max-width: 130px;
+  }
+
+  .map-legend {
+    bottom: 16px;
+    left: 8px;
+    padding: 7px 10px;
+    font-size: 11px;
+  }
+
+  /* Panel KML: reubicarlo debajo del toolbar */
+  .kml-layers-panel {
+    top: auto;
+    bottom: 60px;
+    right: 8px;
+    max-width: 200px;
+  }
+
+  /* ── Modal / Formulario ──────────────────────────────────── */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal-content {
+    border-radius: 16px 16px 0 0;
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    padding: 20px 16px;
+  }
+
+  /* Formulario: 1 columna en móvil */
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .form-field--full {
+    grid-column: 1;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .form-actions button {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  /* ── Tabla ───────────────────────────────────────────────── */
+  .table-container {
+    padding: 10px;
+  }
+
+  .table-toolbar {
+    gap: 6px;
+  }
+
+  .table-toolbar .filter-input {
+    min-width: 0;
+    flex: 1;
+    font-size: 12px;
+  }
+
+  .table-toolbar .filter-select {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+
+  /* Scroll horizontal para tabla — nunca colapsar columnas */
+  .table-container > div[style*="overflow"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table {
+    font-size: 12px;
+    min-width: 700px; /* fuerza scroll horizontal antes de colapsar */
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
+
+  .count-badge {
+    font-size: 11px;
+  }
+
+  /* ── Stats ───────────────────────────────────────────────── */
+  .stats-panel {
+    padding: 14px;
+  }
+
+  .stats-panel h2 {
+    font-size: 17px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+  }
+
+  .stats-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .stats-tabs::-webkit-scrollbar { display: none; }
+
+  .stats-tabs .tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── Excel Panel ─────────────────────────────────────────── */
+  .excel-panel {
+    padding: 14px;
+  }
+
+  .excel-panel h2 {
+    font-size: 18px;
+  }
+
+  .excel-cards {
+    grid-template-columns: 1fr; /* apila las tarjetas */
+    gap: 12px;
+  }
+
+  .excel-card {
+    padding: 16px;
+  }
+
+  .result-stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    padding: 8px 12px;
+  }
+
+  .stat-num {
+    font-size: 20px;
+  }
+
+  /* ── Cuadrantes Panel ────────────────────────────────────── */
+  .cuadrantes-panel {
+    padding: 14px;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .cuadrante-form-card {
+    padding: 14px;
+  }
+
+  /* ── Botones genéricos ───────────────────────────────────── */
+  .btn-primary,
+  .btn-secondary {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  /* Panel de edición/creación de cuadrante en el mapa */
+  /* Desplazarlo al fondo en móvil para no tapar el mapa */
+  .app-main > div[style*="position:relative"] > div[style*="position:absolute"][style*="left:12px"],
+  .app-main > div[style*="position:relative"] > div[style*="position:absolute"][style*="right:12px"] {
+    left: 8px !important;
+    right: 8px !important;
+    top: auto !important;
+    bottom: 8px !important;
+    width: auto !important;
+    max-width: 100% !important;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+}
+
+/* Pantallas muy pequeñas (320px – 480px) */
+@media (max-width: 480px) {
+  .header-brand h1 { font-size: 13px; }
+
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .kpi-value { font-size: 20px; }
+
+  .data-table {
+    font-size: 11px;
+  }
+
+  .tab-btn {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .modal-content {
+    padding: 16px 12px;
+    max-height: 95vh;
+  }
+}

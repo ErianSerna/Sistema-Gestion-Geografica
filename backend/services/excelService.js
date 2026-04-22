@@ -45,6 +45,89 @@ function normalizarColumna(nombre) {
   return null;
 }
 
+// ── Normalización de comuna ──────────────────────────────────
+// Convierte "Comuna 6", "comuna 6", "COMUNA 6", "6" al nombre real.
+// Si el valor ya es un nombre válido, lo respeta tal cual.
+const COMUNAS_MEDELLIN = {
+  '1':  'Popular',        'popular':          'Popular',
+  '2':  'Santa Cruz',     'santa cruz':        'Santa Cruz',
+  '3':  'Manrique',       'manrique':          'Manrique',
+  '4':  'Aranjuez',       'aranjuez':          'Aranjuez',
+  '5':  'Castilla',       'castilla':          'Castilla',
+  '6':  'Doce de Octubre','doce de octubre':   'Doce de Octubre',
+  '7':  'Robledo',        'robledo':           'Robledo',
+  '8':  'Villa Hermosa',  'villa hermosa':     'Villa Hermosa',
+  '9':  'Buenos Aires',   'buenos aires':      'Buenos Aires',
+  '10': 'La Candelaria',  'la candelaria':     'La Candelaria', 'candelaria': 'La Candelaria',
+  '11': 'Laureles',       'laureles':          'Laureles',      'laureles-estadio': 'Laureles',
+  '12': 'La América',     'la america':        'La América',    'america': 'La América',
+  '13': 'San Javier',     'san javier':        'San Javier',
+  '14': 'El Poblado',     'el poblado':        'El Poblado',    'poblado': 'El Poblado',
+  '15': 'Guayabal',       'guayabal':          'Guayabal',
+  '16': 'Belén',          'belen':             'Belén',
+  // Corregimientos
+  'santa elena':              'Santa Elena',
+  'san cristobal':            'San Cristóbal',
+  'san cristóbal':            'San Cristóbal',
+  'altavista':                'Altavista',
+  'san antonio de prado':     'San Antonio de Prado',
+  'san antonio':              'San Antonio de Prado',
+  'san sebastian de palmitas': 'San Sebastián de Palmitas',
+  'palmitas':                 'San Sebastián de Palmitas',
+};
+
+/**
+ * Normaliza el campo "comuna" del Excel al nombre oficial.
+ * Acepta: "Comuna 6", "COMUNA 6", "6", "Doce de Octubre", "santa elena", etc.
+ * Si no reconoce el valor, lo devuelve tal cual (sin sobrescribir).
+ */
+function normalizarComuna(valor) {
+  if (!valor && valor !== 0) return valor || null;
+
+  const raw = String(valor).trim();
+  if (!raw) return null;
+
+  // Quitar tildes para comparación robusta
+  const sinTilde = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Intentar extraer número de "Comuna X" / "COMUNA X" / "comuna X"
+  const matchNumero = raw.match(/^\s*comuna\s*(\d+)\s*$/i);
+  if (matchNumero) {
+    const num = matchNumero[1];
+    if (COMUNAS_MEDELLIN[num]) {
+      console.log(`[Excel] Normalización comuna: "${raw}" → "${COMUNAS_MEDELLIN[num]}"`);
+      return COMUNAS_MEDELLIN[num];
+    }
+  }
+
+  // 2. Intentar si es solo un número ("6", "10")
+  const soloNum = raw.match(/^\d+$/);
+  if (soloNum && COMUNAS_MEDELLIN[raw]) {
+    console.log(`[Excel] Normalización comuna: "${raw}" → "${COMUNAS_MEDELLIN[raw]}"`);
+    return COMUNAS_MEDELLIN[raw];
+  }
+
+  // 3. Buscar por nombre (con/sin tildes, mayúsculas)
+  const rawNorm = sinTilde(raw.toLowerCase());
+  const matchNombre = COMUNAS_MEDELLIN[rawNorm];
+  if (matchNombre) {
+    console.log(`[Excel] Normalización comuna: "${raw}" → "${matchNombre}"`);
+    return matchNombre;
+  }
+
+  // 4. Búsqueda parcial en las claves
+  const claveMatch = Object.keys(COMUNAS_MEDELLIN).find(k =>
+    sinTilde(k) === rawNorm || rawNorm.includes(sinTilde(k)) || sinTilde(k).includes(rawNorm)
+  );
+  if (claveMatch) {
+    console.log(`[Excel] Normalización comuna (parcial): "${raw}" → "${COMUNAS_MEDELLIN[claveMatch]}"`);
+    return COMUNAS_MEDELLIN[claveMatch];
+  }
+
+  // 5. El valor no se reconoce — devolverlo tal cual para no perder info
+  return raw;
+}
+
 // ── IMPORTAR ─────────────────────────────────────────────────
 async function importarDesdeExcel(buffer) {
   let workbook;
@@ -110,6 +193,11 @@ async function importarDesdeExcel(buffer) {
     // Normalizar vota_pacto
     const votaRaw = String(p.vota_pacto ?? '').toLowerCase().trim();
     p.vota_pacto = ['si','sí','yes','1','true','x','✓','verdadero'].includes(votaRaw);
+
+    // Normalizar comuna: "Comuna 6" → "Doce de Octubre", "santa elena" → "Santa Elena", etc.
+    if (p.comuna !== undefined) {
+      p.comuna = normalizarComuna(p.comuna);
+    }
 
     // ── Coordenadas: leer SOLO de esta fila ─────────────────────────
     // Importante: limpiar explícitamente para que nunca hereden valores
