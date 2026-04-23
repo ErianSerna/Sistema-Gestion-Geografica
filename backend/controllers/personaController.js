@@ -12,6 +12,7 @@ const personaController = {
         comuna:       req.query.comuna       || undefined,
         barrio:       req.query.barrio       || undefined,
         cuadrante_id: req.query.cuadrante_id || undefined,
+        cedula:       req.query.cedula       || undefined,
       };
       Object.keys(filtros).forEach(k => filtros[k] === undefined && delete filtros[k]);
       const personas = await Persona.obtenerTodas(filtros);
@@ -25,6 +26,7 @@ const personaController = {
         comuna:       req.query.comuna       || undefined,
         barrio:       req.query.barrio       || undefined,
         cuadrante_id: req.query.cuadrante_id || undefined,
+        cedula:       req.query.cedula       || undefined,
       };
       Object.keys(filtros).forEach(k => filtros[k] === undefined && delete filtros[k]);
       const geojson = await Persona.obtenerGeoJSON(filtros);

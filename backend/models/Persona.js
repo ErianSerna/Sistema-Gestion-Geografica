@@ -56,6 +56,7 @@ class Persona {
     if (filtros.comuna)       { condiciones.push(`p.comuna = $${idx++}`);        params.push(filtros.comuna); }
     if (filtros.barrio)       { condiciones.push(`p.barrio ILIKE $${idx++}`);     params.push(`%${filtros.barrio}%`); }
     if (filtros.cuadrante_id) { condiciones.push(`p.cuadrante_id = $${idx++}`);   params.push(filtros.cuadrante_id); }
+    if (filtros.cedula)       { condiciones.push(`p.cedula = $${idx++}`);              params.push(String(filtros.cedula).replace(/\D/g, '')); }
 
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
     const sql = `

@@ -150,6 +150,17 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
    Todos los estilos desktop se mantienen intactos arriba.
    ============================================================ */
 
+/* ── Buscador por cédula (desktop: compacto en toolbar) ───── */
+.cedula-search {
+  width: 120px;
+  transition: width 0.2s;
+}
+.cedula-search:focus {
+  width: 160px;
+  outline: none;
+  border-color: var(--azul-mapa);
+}
+
 @media (max-width: 768px) {
 
   /* ── Header ──────────────────────────────────────────────── */
@@ -163,7 +174,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
   .header-brand h1 { font-size: 14px; }
   .header-brand p  { font-size: 11px; }
 
-  /* Tabs: scroll horizontal para que quepan todas */
+  /* Tabs: scroll horizontal, sin saltos de línea */
   .tab-nav {
     width: 100%;
     margin-left: 0;
@@ -182,7 +193,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
     flex-shrink: 0;
   }
 
-  /* Botones de acción del header: fila compacta */
+  /* Botones de acción del header */
   .app-header > div:last-child {
     width: 100%;
     flex-wrap: wrap;
@@ -197,31 +208,45 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
     transform: none;
     width: auto;
     flex-wrap: wrap;
-    gap: 6px;
-    padding: 8px 10px;
+    gap: 5px;
+    padding: 7px 9px;
     border-radius: 14px;
-    /* En móvil reducir tamaño de selects del mapa */
+    /* Permitir que los filtros se envuelvan debajo del buscador */
+    align-items: center;
+  }
+
+  /* En móvil los filtros arrancan ocultos vía JS state,
+     pero si el usuario los activa deben verse bien */
+  .map-toolbar .filter-select,
+  .map-toolbar .filter-input:not(.cedula-search) {
+    font-size: 12px;
+    padding: 4px 6px;
   }
 
   .map-toolbar .filter-select {
     font-size: 12px;
     padding: 4px 6px;
-    max-width: 130px;
+    max-width: 120px;
   }
+
+  /* Ocultar elementos KML en móvil — interfaz más limpia */
+  .map-toolbar .kml-toolbar-btn { display: none !important; }
+  .kml-layers-panel              { display: none !important; }
+  /* Ocultar los divisores del toolbar en móvil */
+  .toolbar-divider               { display: none !important; }
+
+  /* Buscador por cédula — ancho completo en móvil */
+  .cedula-search {
+    width: 100px;
+    font-size: 12px;
+  }
+  .cedula-search:focus { width: 130px; }
 
   .map-legend {
     bottom: 16px;
     left: 8px;
     padding: 7px 10px;
     font-size: 11px;
-  }
-
-  /* Panel KML: reubicarlo debajo del toolbar */
-  .kml-layers-panel {
-    top: auto;
-    bottom: 60px;
-    right: 8px;
-    max-width: 200px;
   }
 
   /* ── Modal / Formulario ──────────────────────────────────── */
@@ -243,16 +268,12 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
     grid-template-columns: 1fr;
     gap: 12px;
   }
-
-  .form-field--full {
-    grid-column: 1;
-  }
+  .form-field--full { grid-column: 1; }
 
   .form-actions {
     flex-direction: column-reverse;
     gap: 8px;
   }
-
   .form-actions button {
     width: 100%;
     padding: 10px;
@@ -260,63 +281,40 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
   }
 
   /* ── Tabla ───────────────────────────────────────────────── */
-  .table-container {
-    padding: 10px;
-  }
-
-  .table-toolbar {
-    gap: 6px;
-  }
+  .table-container { padding: 10px; }
+  .table-toolbar   { gap: 6px; }
 
   .table-toolbar .filter-input {
     min-width: 0;
     flex: 1;
     font-size: 12px;
   }
-
   .table-toolbar .filter-select {
     font-size: 12px;
     padding: 4px 6px;
   }
 
-  /* Scroll horizontal para tabla — nunca colapsar columnas */
-  .table-container > div[style*="overflow"] {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-  }
-
   .data-table {
     font-size: 12px;
-    min-width: 700px; /* fuerza scroll horizontal antes de colapsar */
+    min-width: 700px;
   }
-
   .data-table th,
   .data-table td {
     padding: 6px 8px;
     white-space: nowrap;
   }
 
-  .count-badge {
-    font-size: 11px;
-  }
+  .count-badge { font-size: 11px; }
 
   /* ── Stats ───────────────────────────────────────────────── */
-  .stats-panel {
-    padding: 14px;
-  }
-
-  .stats-panel h2 {
-    font-size: 17px;
-  }
+  .stats-panel    { padding: 14px; }
+  .stats-panel h2 { font-size: 17px; }
 
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
-
-  .kpi-value {
-    font-size: 22px;
-  }
+  .kpi-value { font-size: 22px; }
 
   .stats-tabs {
     overflow-x: auto;
@@ -324,35 +322,22 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
     scrollbar-width: none;
   }
   .stats-tabs::-webkit-scrollbar { display: none; }
-
-  .stats-tabs .tab-btn {
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
+  .stats-tabs .tab-btn { white-space: nowrap; flex-shrink: 0; }
 
   /* ── Excel Panel ─────────────────────────────────────────── */
-  .excel-panel {
-    padding: 14px;
-  }
-
-  .excel-panel h2 {
-    font-size: 18px;
-  }
+  .excel-panel    { padding: 14px; }
+  .excel-panel h2 { font-size: 18px; }
 
   .excel-cards {
-    grid-template-columns: 1fr; /* apila las tarjetas */
+    grid-template-columns: 1fr;
     gap: 12px;
   }
-
-  .excel-card {
-    padding: 16px;
-  }
+  .excel-card { padding: 16px; }
 
   .result-stats {
     flex-direction: column;
     gap: 8px;
   }
-
   .stat-item {
     display: flex;
     align-items: center;
@@ -360,37 +345,27 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
     text-align: left;
     padding: 8px 12px;
   }
-
-  .stat-num {
-    font-size: 20px;
-  }
+  .stat-num { font-size: 20px; }
 
   /* ── Cuadrantes Panel ────────────────────────────────────── */
-  .cuadrantes-panel {
-    padding: 14px;
-  }
+  .cuadrantes-panel { padding: 14px; }
 
   .panel-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
+  .cuadrante-form-card { padding: 14px; }
 
-  .cuadrante-form-card {
-    padding: 14px;
-  }
-
-  /* ── Botones genéricos ───────────────────────────────────── */
+  /* ── Botones ─────────────────────────────────────────────── */
   .btn-primary,
   .btn-secondary {
     font-size: 13px;
     padding: 8px 12px;
   }
 
-  /* Panel de edición/creación de cuadrante en el mapa */
-  /* Desplazarlo al fondo en móvil para no tapar el mapa */
-  .app-main > div[style*="position:relative"] > div[style*="position:absolute"][style*="left:12px"],
-  .app-main > div[style*="position:relative"] > div[style*="position:absolute"][style*="right:12px"] {
+  /* Paneles flotantes del mapa (crear/editar cuadrante): al fondo */
+  .map-panel-flotante {
     left: 8px !important;
     right: 8px !important;
     top: auto !important;
@@ -402,27 +377,22 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-s
   }
 }
 
-/* Pantallas muy pequeñas (320px – 480px) */
+/* Pantallas muy pequeñas (320–480px) */
 @media (max-width: 480px) {
   .header-brand h1 { font-size: 13px; }
 
-  .kpi-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+  .kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .kpi-value  { font-size: 20px; }
 
-  .kpi-value { font-size: 20px; }
+  .data-table { font-size: 11px; }
 
-  .data-table {
-    font-size: 11px;
-  }
-
-  .tab-btn {
-    font-size: 11px;
-    padding: 4px 8px;
-  }
+  .tab-btn    { font-size: 11px; padding: 4px 8px; }
 
   .modal-content {
     padding: 16px 12px;
     max-height: 95vh;
   }
+
+  .map-toolbar .filter-select { max-width: 100px; font-size: 11px; }
+  .cedula-search { width: 85px; }
 }

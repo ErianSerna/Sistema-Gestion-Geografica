@@ -195,6 +195,13 @@ export default function MapView({
   const [filtros,          setFiltros]          = useState({ comuna: '' });
   const [filtrosCuad,      setFiltrosCuad]      = useState({ comuna: '', barrio: '' });
   const [loading,          setLoading]          = useState(false);
+  // Buscador por cédula
+  const [busquedaCedula,   setBusquedaCedula]   = useState('');
+  const [busquedaActiva,   setBusquedaActiva]   = useState(false);
+  // Toggle filtros: ocultos por defecto en móvil (≤768px), visibles en desktop
+  const [filtrosVisibles,  setFiltrosVisibles]  = useState(
+    () => typeof window !== 'undefined' ? window.innerWidth > 768 : true
+  );
   const [kmlCapas,     setKmlCapas]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('kmlCapas')) || []; } catch { return []; }
   });
@@ -689,8 +696,10 @@ export default function MapView({
   useEffect(() => {
     filtrosRef.current = filtros;
     if (!leafletMap.current) return;
+    // No sobreescribir resultados de búsqueda activa por cédula
+    if (busquedaActiva) return;
     cargarPines(filtros);
-  }, [filtros]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filtros, busquedaActiva]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Filtros de cuadrantes (local, sin nueva petición) ───────
   useEffect(() => {
@@ -766,6 +775,59 @@ export default function MapView({
     setKmlCapas(prev => prev.filter(c => c.nombre !== nombre));
   };
 
+  // ── Búsqueda por cédula ──────────────────────────────────────
+  const buscarPorCedula = async () => {
+    const ced = busquedaCedula.trim().replace(/\D/g, '');
+    if (!ced) { limpiarBusqueda(); return; }
+    if (!markersLayer.current) return;
+    setLoading(true);
+    setBusquedaActiva(true);
+    try {
+      const { data } = await api.get('/personas/geojson', { params: { cedula: ced } });
+      markersLayer.current.clearLayers();
+      if (!data.features?.length) {
+        toast.error(`No se encontró persona con cédula ${ced}`);
+        setBusquedaActiva(false);
+        return;
+      }
+      L.geoJSON(data, {
+        pointToLayer: (feature, latlng) =>
+          L.marker(latlng, { icon: crearIcono(), draggable: true }),
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties;
+          layer.bindPopup(() => crearPopupDOM(p), { maxWidth: 280 });
+          layer.on('click', (e) => { L.DomEvent.stopPropagation(e); onPinClick(p); });
+          layer.on('dragstart', () => layer.closePopup());
+          layer.on('dragend', async (e) => {
+            const { lat, lng } = e.target.getLatLng();
+            const toastId = toast.loading(`Guardando posición de ${p.nombre}...`);
+            try {
+              await api.patch(`/personas/${p.id}/ubicacion`, { latitud: lat, longitud: lng });
+              p.latitud = lat; p.longitud = lng;
+              toast.success(`📍 ${p.nombre} movido`, { id: toastId });
+            } catch {
+              e.target.setLatLng([p.latitud, p.longitud]);
+              toast.error('Error guardando posición', { id: toastId });
+            }
+          });
+        },
+      }).addTo(markersLayer.current);
+      const f = data.features[0];
+      const [lon, lat] = f.geometry.coordinates;
+      leafletMap.current?.setView([lat, lon], 17);
+      toast.success(`📍 ${f.properties.nombre} — cédula ${ced}`);
+    } catch {
+      toast.error('Error buscando persona');
+      setBusquedaActiva(false);
+    } finally { setLoading(false); }
+  };
+
+  const limpiarBusqueda = () => {
+    setBusquedaCedula('');
+    setBusquedaActiva(false);
+    cargarPines(filtrosRef.current);
+  };
+
   const nPuntos = cuadranteEnCurso?.poligono?.length || 0;
   const cursor  = esModoCrearCuadrante || esModoEditGeom ? 'crosshair' : '';
 
@@ -784,65 +846,118 @@ export default function MapView({
 
       {/* Toolbar */}
       <div className="map-toolbar">
-        {/* Filtro personas por comuna */}
-        <select
-          value={filtros.comuna}
-          onChange={e=>setFiltros(f=>({...f,comuna:e.target.value}))}
-          className="filter-select"
-          title="Filtrar personas por comuna"
-        >
-          <option value="">👥 Todas las comunas</option>
-          {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
+        {/* ── Fila siempre visible: buscador + toggle filtros ── */}
 
-        {/* Divisor */}
-        <span style={{color:'var(--border)',fontSize:'18px',lineHeight:1}}>│</span>
-
-        {/* Filtro cuadrantes por comuna */}
-        <select
-          value={filtrosCuad.comuna}
-          onChange={e => setFiltrosCuad(f => ({ ...f, comuna: e.target.value, barrio: '' }))}
-          className="filter-select"
-          title="Filtrar cuadrantes por comuna"
-          style={{borderColor: filtrosCuad.comuna ? '#2563EB' : undefined}}
-        >
-          <option value="">🔲 Todas comunas</option>
-          {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
-
-        {/* Filtro cuadrantes por barrio */}
-        <select
-          value={filtrosCuad.barrio}
-          onChange={e => setFiltrosCuad(f => ({ ...f, barrio: e.target.value }))}
-          className="filter-select"
-          title="Filtrar cuadrantes por barrio"
-          style={{borderColor: filtrosCuad.barrio ? '#2563EB' : undefined}}
-        >
-          <option value="">🏘️ Todos los barrios</option>
-          {barriosEnMapa.map(b=><option key={b} value={b}>{b}</option>)}
-        </select>
-
-        {/* Limpiar filtros de cuadrantes */}
-        {(filtrosCuad.comuna || filtrosCuad.barrio) && (
+        {/* Buscador por cédula — siempre visible */}
+        <input
+          placeholder="🔍 Cédula..."
+          value={busquedaCedula}
+          onChange={e => setBusquedaCedula(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') buscarPorCedula(); }}
+          className="filter-input cedula-search"
+          style={{ width: '120px', fontSize: '12px', padding: '4px 8px' }}
+          title="Buscar persona exacta por cédula"
+        />
+        <button
+          className="btn-secondary"
+          onClick={buscarPorCedula}
+          title="Buscar en el mapa"
+          style={{ padding: '4px 8px', fontSize: '12px' }}
+        >🔍</button>
+        {busquedaActiva && (
           <button
             className="btn-secondary"
-            onClick={() => setFiltrosCuad({ comuna: '', barrio: '' })}
-            title="Quitar filtros de cuadrantes"
-            style={{padding:'4px 8px',fontSize:'12px'}}
-          >✕ Cuadrantes</button>
+            onClick={limpiarBusqueda}
+            title="Mostrar todos los pines"
+            style={{ padding: '4px 8px', fontSize: '12px', color: '#DC2626', fontWeight: 600 }}
+          >✕ Ver todos</button>
         )}
 
-        <button className="btn-secondary" onClick={cargarCuadrantes} title="Recargar cuadrantes">🔄</button>
-        <label className={`btn-secondary ${kmlLoading?'disabled':''}`} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:'4px'}}>
-          {kmlLoading?'⏳':'📂'} KML
-          <input ref={kmlFileRef} type="file" accept=".kml" onChange={handleKmlImport} disabled={kmlLoading} style={{display:'none'}}/>
-        </label>
+        <span className="toolbar-divider" style={{color:'var(--border)',fontSize:'18px',lineHeight:1}}>│</span>
+
+        {/* Toggle filtros */}
+        <button
+          className="btn-secondary"
+          onClick={() => setFiltrosVisibles(v => !v)}
+          title={filtrosVisibles ? 'Ocultar filtros' : 'Mostrar filtros'}
+          style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+        >
+          {filtrosVisibles ? '▲' : '▼'} Filtros
+          {/* Indicador de filtros activos */}
+          {(filtros.comuna || filtrosCuad.comuna || filtrosCuad.barrio) && (
+            <span style={{
+              width: '6px', height: '6px', borderRadius: '50%',
+              background: '#2563EB', display: 'inline-block', flexShrink: 0,
+            }}/>
+          )}
+        </button>
+
+        {/* ── Filtros colapsables ── */}
+        {filtrosVisibles && (
+          <>
+            <span style={{color:'var(--border)',fontSize:'18px',lineHeight:1}}>│</span>
+
+            {/* Filtro personas por comuna */}
+            <select
+              value={filtros.comuna}
+              onChange={e=>setFiltros(f=>({...f,comuna:e.target.value}))}
+              className="filter-select"
+              title="Filtrar personas por comuna"
+            >
+              <option value="">👥 Todas las comunas</option>
+              {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <span style={{color:'var(--border)',fontSize:'18px',lineHeight:1}}>│</span>
+
+            {/* Filtro cuadrantes por comuna */}
+            <select
+              value={filtrosCuad.comuna}
+              onChange={e => setFiltrosCuad(f => ({ ...f, comuna: e.target.value, barrio: '' }))}
+              className="filter-select"
+              title="Filtrar cuadrantes por comuna"
+              style={{borderColor: filtrosCuad.comuna ? '#2563EB' : undefined}}
+            >
+              <option value="">🔲 Todas comunas</option>
+              {COMUNAS_MEDELLIN.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            {/* Filtro cuadrantes por barrio */}
+            <select
+              value={filtrosCuad.barrio}
+              onChange={e => setFiltrosCuad(f => ({ ...f, barrio: e.target.value }))}
+              className="filter-select"
+              title="Filtrar cuadrantes por barrio"
+              style={{borderColor: filtrosCuad.barrio ? '#2563EB' : undefined}}
+            >
+              <option value="">🏘️ Todos los barrios</option>
+              {barriosEnMapa.map(b=><option key={b} value={b}>{b}</option>)}
+            </select>
+
+            {/* Limpiar filtros de cuadrantes */}
+            {(filtrosCuad.comuna || filtrosCuad.barrio) && (
+              <button
+                className="btn-secondary"
+                onClick={() => setFiltrosCuad({ comuna: '', barrio: '' })}
+                title="Quitar filtros de cuadrantes"
+                style={{padding:'4px 8px',fontSize:'12px'}}
+              >✕ Cuadrantes</button>
+            )}
+
+            <button className="btn-secondary" onClick={cargarCuadrantes} title="Recargar cuadrantes">🔄</button>
+            <label className={`btn-secondary kml-toolbar-btn ${kmlLoading?'disabled':''}`} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:'4px'}}>
+              {kmlLoading?'⏳':'📂'} KML
+              <input ref={kmlFileRef} type="file" accept=".kml" onChange={handleKmlImport} disabled={kmlLoading} style={{display:'none'}}/>
+            </label>
+          </>
+        )}
+
         {loading && <span className="loading-badge">Cargando...</span>}
       </div>
 
       {/* Panel edición de geometría desde el mapa */}
       {esModoEditGeom && (
-        <div style={{
+        <div className="map-panel-flotante" style={{
           position:'absolute', top:'60px', right:'12px', zIndex:1100,
           background:'white', borderRadius:'10px', padding:'14px 16px',
           boxShadow:'0 4px 20px rgba(0,0,0,0.2)', width:'270px',
@@ -904,7 +1019,7 @@ export default function MapView({
 
       {/* Panel creación de cuadrante */}
       {esModoCrearCuadrante && (
-        <div style={{
+        <div className="map-panel-flotante" style={{
           position:'absolute', top:'60px', left:'12px', zIndex:1100,
           background:'white', borderRadius:'10px', padding:'14px 16px',
           boxShadow:'0 4px 20px rgba(0,0,0,0.18)', width:'270px',

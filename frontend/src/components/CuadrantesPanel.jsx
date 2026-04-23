@@ -424,7 +424,6 @@ export default function CuadrantesPanel() {
               <input ref={geojsonFileRef} type="file" accept=".geojson,.json"
                 onChange={handleGeoJSONImport} disabled={importando} style={{ display:'none' }} />
             </label>
-            <button className="btn-primary" onClick={() => setModoCrear(true)}>+ Nuevo cuadrante</button>
           </div>
         )}
       </div>
